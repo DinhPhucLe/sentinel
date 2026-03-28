@@ -1,162 +1,184 @@
 """
-LangGraph orchestrator — wires all agents into a sequential pipeline.
+ADK orchestrator — SequentialAgent pipeline with streaming WebSocket support.
 
-State flows: tracking → prediction → optimization → negotiation → governance
+Pipeline: tracking → prediction → optimization → negotiation → governance
 
-The orchestrator streams agent_log entries over WebSocket as each node completes.
-Agents never call each other directly — all data passes through AgentState.
+Each agent's output is stored in session state via output_key and is visible
+to subsequent agents through the conversation history.
 """
 
 import asyncio
+import uuid
 from datetime import datetime, timezone
-from typing import Any, AsyncGenerator, Callable
+from typing import AsyncGenerator, Callable, Any
 
-from langgraph.graph import StateGraph, END
+from google.adk.agents import SequentialAgent
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types as genai_types
 
-from models import AgentState, ConjunctionEvent, RiskScore, ManeuverOption, Decision
-from tools.orbital_sim import get_conjunction_events
+from agents.tracking_agent import tracking_agent
+from agents.prediction_agent import prediction_agent
+from agents.optimization_agent import optimization_agent
+from agents.negotiation_agent import negotiation_agent
+from agents.governance_agent import governance_agent
+from tools.orbital_sim import get_conjunction_events, get_kessler_cascade_events
 
-# Import agent node functions (defined below as thin wrappers)
-from agents.tracking_agent import run as tracking_run
-from agents.prediction_agent import run as prediction_run
-from agents.optimization_agent import run as optimization_run
-from agents.negotiation_agent import run as negotiation_run
-from agents.governance_agent import run as governance_run
+APP_NAME = "orbital_traffic_control"
+
+# Agent display order for streaming — maps author name to label
+AGENT_ORDER = [
+    "tracking_agent",
+    "prediction_agent",
+    "optimization_agent",
+    "negotiation_agent",
+    "governance_agent",
+]
+
+# Build the sequential pipeline
+pipeline = SequentialAgent(
+    name="orbital_pipeline",
+    sub_agents=[
+        tracking_agent,
+        prediction_agent,
+        optimization_agent,
+        negotiation_agent,
+        governance_agent,
+    ],
+)
+
+_session_service = InMemorySessionService()
+_runner = Runner(
+    agent=pipeline,
+    app_name=APP_NAME,
+    session_service=_session_service,
+)
 
 
 def _ts() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-# ---------------------------------------------------------------------------
-# Node wrappers — each node updates state and appends to agent_log
-# ---------------------------------------------------------------------------
+def _extract_text(event) -> str:
+    """Pull plain text out of an ADK Event content object."""
+    if not event.content or not event.content.parts:
+        return ""
+    return "".join(
+        part.text for part in event.content.parts if hasattr(part, "text") and part.text
+    )
 
-def tracking_node(state: dict) -> dict:
-    return tracking_run(state)
-
-
-def prediction_node(state: dict) -> dict:
-    return prediction_run(state)
-
-
-def optimization_node(state: dict) -> dict:
-    return optimization_run(state)
-
-
-def negotiation_node(state: dict) -> dict:
-    return negotiation_run(state)
-
-
-def governance_node(state: dict) -> dict:
-    return governance_run(state)
-
-
-# ---------------------------------------------------------------------------
-# Build the LangGraph graph
-# ---------------------------------------------------------------------------
-
-def _build_graph() -> Any:
-    graph = StateGraph(dict)
-    graph.add_node("tracking", tracking_node)
-    graph.add_node("prediction", prediction_node)
-    graph.add_node("optimization", optimization_node)
-    graph.add_node("negotiation", negotiation_node)
-    graph.add_node("governance", governance_node)
-
-    graph.set_entry_point("tracking")
-    graph.add_edge("tracking", "prediction")
-    graph.add_edge("prediction", "optimization")
-    graph.add_edge("optimization", "negotiation")
-    graph.add_edge("negotiation", "governance")
-    graph.add_edge("governance", END)
-
-    return graph.compile()
-
-
-_COMPILED_GRAPH = None
-
-
-def get_compiled_graph():
-    global _COMPILED_GRAPH
-    if _COMPILED_GRAPH is None:
-        _COMPILED_GRAPH = _build_graph()
-    return _COMPILED_GRAPH
-
-
-# ---------------------------------------------------------------------------
-# Async streaming runner — used by the WebSocket endpoint
-# ---------------------------------------------------------------------------
 
 async def run_pipeline_streaming(
     emit: Callable[[dict], Any],
     kessler: bool = False,
-) -> dict:
+) -> None:
     """
-    Run the full agent pipeline and call emit() with each WebSocket message.
+    Run the full ADK agent pipeline and call emit() with each WebSocket message.
 
-    emit() receives dicts like:
+    emit() receives dicts:
       {"type": "agent_log", "agent": "...", "message": "...", "timestamp": "..."}
       {"type": "decision", "data": {...}}
       {"type": "status", "status": "..."}
     """
-    from tools.orbital_sim import get_conjunction_events, get_kessler_cascade_events
-
     events = get_kessler_cascade_events() if kessler else get_conjunction_events()
 
-    initial_state: dict = {
-        "conjunction_events": events,
-        "risk_scores": [],
-        "maneuver_options": [],
-        "decision": None,
-        "agent_log": [],
-    }
+    # Serialise conjunction events as a human-readable brief for the first agent
+    event_lines = []
+    for ev in events:
+        event_lines.append(
+            f"- {ev.id}: {ev.sat_a.name} ({ev.sat_a.operator}, P{ev.sat_a.priority}) ↔ "
+            f"{ev.sat_b.name} ({ev.sat_b.operator}, P{ev.sat_b.priority}) | "
+            f"prob={ev.collision_probability:.0%} | TCA={ev.time_to_closest_approach_hours:.1f}h | "
+            f"miss={ev.miss_distance_km:.2f}km | "
+            f"ctrl_a={ev.sat_a.controllable} ctrl_b={ev.sat_b.controllable}"
+        )
+    initial_brief = (
+        "ACTIVE CONJUNCTION EVENTS — assess immediately:\n" + "\n".join(event_lines)
+    )
+
+    # Create a fresh session per run
+    user_id = "operator"
+    session_id = f"run-{uuid.uuid4().hex[:8]}"
+    _session_service.create_session(
+        app_name=APP_NAME,
+        user_id=user_id,
+        session_id=session_id,
+    )
 
     await emit({"type": "status", "status": "ANALYZING", "timestamp": _ts()})
 
-    # Run each node manually so we can stream after each completes
-    state = initial_state
+    # Status transitions per agent
+    status_map = {
+        "tracking_agent":     "ANALYZING",
+        "prediction_agent":   "ANALYZING",
+        "optimization_agent": "ANALYZING",
+        "negotiation_agent":  "DECIDING",
+        "governance_agent":   "VALIDATING",
+    }
 
-    # Node sequence with display names
-    nodes = [
-        ("tracking", tracking_node, "TRACKING"),
-        ("prediction", prediction_node, "ANALYZING"),
-        ("optimization", optimization_node, "ANALYZING"),
-        ("negotiation", negotiation_node, "DECIDING"),
-        ("governance", governance_node, "VALIDATING"),
-    ]
+    seen_agents: set[str] = set()
+    current_agent_buffer: dict[str, list[str]] = {}
 
-    seen_log_count = 0
+    new_message = genai_types.Content(
+        role="user",
+        parts=[genai_types.Part(text=initial_brief)],
+    )
 
-    for node_name, node_fn, status in nodes:
-        await emit({"type": "status", "status": status, "timestamp": _ts()})
+    async for event in _runner.run_async(
+        user_id=user_id,
+        session_id=session_id,
+        new_message=new_message,
+    ):
+        author = event.author or ""
 
-        # Run node in a thread to avoid blocking the event loop
-        loop = asyncio.get_event_loop()
-        state = await loop.run_in_executor(None, node_fn, state)
+        # Emit status transition when a new agent starts
+        if author in AGENT_ORDER and author not in seen_agents:
+            seen_agents.add(author)
+            status = status_map.get(author, "ANALYZING")
+            await emit({"type": "status", "status": status, "timestamp": _ts()})
 
-        # Stream any new agent_log entries produced by this node
-        new_entries = state["agent_log"][seen_log_count:]
-        for entry in new_entries:
-            await emit({"type": "agent_log", **entry})
-            await asyncio.sleep(0.05)  # slight pacing for UI effect
-        seen_log_count = len(state["agent_log"])
+        text = _extract_text(event)
+        if not text:
+            continue
 
-    # Emit the final decision
-    decision: Decision | None = state.get("decision")
-    if decision:
-        await emit({
-            "type": "decision",
-            "data": decision.to_dict(),
-            "timestamp": _ts(),
-        })
-        await emit({"type": "status", "status": "AVOIDED", "timestamp": _ts()})
-    else:
-        await emit({
-            "type": "status",
-            "status": "ERROR",
-            "message": "No decision produced",
-            "timestamp": _ts(),
-        })
+        # Buffer partial chunks per agent
+        if author not in current_agent_buffer:
+            current_agent_buffer[author] = []
+        current_agent_buffer[author].append(text)
 
-    return state
+        # On final response from an agent, emit the full message
+        if event.is_final_response() and author in AGENT_ORDER:
+            full_message = "".join(current_agent_buffer.get(author, []))
+            await emit({
+                "type": "agent_log",
+                "agent": author,
+                "message": full_message.strip(),
+                "timestamp": _ts(),
+            })
+            # Small pause so the UI can animate each entry
+            await asyncio.sleep(0.1)
+
+    # Emit the governance output as the final decision signal
+    session = _session_service.get_session(
+        app_name=APP_NAME, user_id=user_id, session_id=session_id
+    )
+    governance_output = session.state.get("governance_validation", "") if session else ""
+    negotiation_output = session.state.get("negotiation_decision", "") if session else ""
+
+    validated = "validated: true" in governance_output.lower() or "approved" in governance_output.lower()
+
+    await emit({
+        "type": "decision",
+        "data": {
+            "negotiation_decision": negotiation_output,
+            "governance_validation": governance_output,
+            "validated": validated,
+        },
+        "timestamp": _ts(),
+    })
+
+    await emit({
+        "type": "status",
+        "status": "AVOIDED" if validated else "ERROR",
+        "timestamp": _ts(),
+    })

@@ -26,8 +26,6 @@ from tools.orbital_sim import get_conjunction_events, get_kessler_cascade_events
 from agents.orchestrator import run_pipeline_streaming
 from config import WS_MSG_AGENT, WS_MSG_DECISION, WS_MSG_STATUS, WS_MSG_ERROR
 
-import json as _json
-
 _DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
 
