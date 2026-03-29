@@ -212,9 +212,16 @@ async def ws_agent_stream(websocket: WebSocket):
 @app.post("/api/chat")
 async def chat(body: dict):
     import re
+    from fastapi import HTTPException
     from litellm import acompletion
 
-    message = body.get("message", "")
+    if not os.environ.get("GROQ_API_KEY"):
+        raise HTTPException(status_code=503, detail="GROQ_API_KEY not configured")
+
+    message = (body.get("message") or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="message is required")
+
     context = body.get("context", {})
     history = body.get("history", [])
 
