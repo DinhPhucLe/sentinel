@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone
 
 from config import RAW_DIR
-from downloader import download_all
+from downloader import download_all, get_existing_query_files
 from processor import run as run_processor
 
 
@@ -88,15 +88,19 @@ def run_due_groups(state: dict, run_now: bool) -> bool:
     now = utc_now()
     ran_any = False
     groups = state.setdefault("groups", {})
+    existing_files = set(get_existing_query_files())
 
     for group_name, cfg in SCHEDULE_GROUPS.items():
         if not is_due(group_name, state, now, run_now):
             continue
 
-        files = cfg["files"]
+        files = [f for f in cfg["files"] if f in existing_files]
+        if not files:
+            print(f"\n[{iso_utc(utc_now())}] Skipping group: {group_name} (no matching existing files)")
+            continue
         print(f"\n[{iso_utc(utc_now())}] Running group: {group_name}")
         print(f"Files: {', '.join(files)}")
-        summary = download_all(selected_files=files)
+        summary = download_all(selected_files=files, existing_only=True)
 
         ran_any = True
         groups.setdefault(group_name, {})

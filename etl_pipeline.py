@@ -6,6 +6,7 @@
 #    python etl_pipeline.py --download # download only
 #    python etl_pipeline.py --process  # process only (uses existing raw CSVs)
 #    python etl_pipeline.py --verify   # verify raw files exist and show row counts
+#    python etl_pipeline.py --all-files # download all configured query files
 # ─────────────────────────────────────────────
 
 import sys
@@ -56,11 +57,11 @@ def verify():
     print()
 
 
-def run_download():
+def run_download(existing_only: bool = True):
     from downloader import download_all
-    summary = download_all()
+    summary = download_all(existing_only=existing_only)
     if not summary:
-        print("\n[ABORT] Download failed – check credentials in config.py")
+        print("\n[ABORT] Download failed or no matching existing files found.")
         sys.exit(1)
 
     errors = [k for k,v in summary.items() if isinstance(v, str) and "ERROR" in v]
@@ -79,12 +80,14 @@ def main():
     print_banner()
     args = sys.argv[1:]
 
+    existing_only = "--all-files" not in args
+
     if "--verify" in args:
         verify()
         return
 
     if "--download" in args and "--process" not in args:
-        run_download()
+        run_download(existing_only=existing_only)
         return
 
     if "--process" in args and "--download" not in args:
@@ -93,7 +96,7 @@ def main():
 
     # Default: full pipeline
     print(f"Started at {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n")
-    run_download()
+    run_download(existing_only=existing_only)
     run_process()
     verify()
     print(f"\nFinished at {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")

@@ -1,13 +1,8 @@
 {
-  "downloaded_at_utc": "2026-03-28T22:20:02.284335Z",
+  "downloaded_at_utc": "2026-03-29T06:42:44.631576Z",
   "files": {
-    "debris_orbital.csv": 9776,
-    "payload_orbital.csv": 17070,
-    "rocket_orbital.csv": 2164,
-    "satcat_all.csv": 68277,
-    "decay_predictions.csv": 500,
-    "tip_messages.csv": 435,
-    "conjunctions.csv": 200,
-    "boxscore.csv": 122
+    "debris_orbital.csv": 9774,
+    "payload_orbital.csv": 17068,
+    "rocket_orbital.csv": 2162
   }
 }

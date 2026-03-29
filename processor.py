@@ -5,7 +5,7 @@
 import os
 import json
 import pandas as pd
-from config import RAW_DIR, PROCESSED_DIR, ANALYSIS_DIR, GLOBE_COLUMNS
+from config import RAW_DIR, DATA_DIR, PROCESSED_DIR, ANALYSIS_DIR, GLOBE_COLUMNS
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -13,8 +13,12 @@ from config import RAW_DIR, PROCESSED_DIR, ANALYSIS_DIR, GLOBE_COLUMNS
 def _read_csv(filename: str, directory: str = RAW_DIR) -> pd.DataFrame | None:
     path = os.path.join(directory, filename)
     if not os.path.exists(path):
-        print(f"  [WARN] File not found: {path}")
-        return None
+        fallback = os.path.join(DATA_DIR, filename)
+        if os.path.exists(fallback):
+            path = fallback
+        else:
+            print(f"  [WARN] File not found: {path} (or {fallback})")
+            return None
     try:
         df = pd.read_csv(path, low_memory=False)
         print(f"  [OK] Loaded {filename}  ({len(df):,} rows, {len(df.columns)} cols)")

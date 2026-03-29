@@ -13,6 +13,9 @@ CREDENTIALS = {
 
 BASE_URL = "https://www.space-track.org"
 
+# Base data directory
+DATA_DIR = "data"
+
 # Where raw CSV files are saved after download
 RAW_DIR = "data/raw"
 

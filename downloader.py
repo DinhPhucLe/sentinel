@@ -6,7 +6,7 @@ import os
 import time
 import requests
 from datetime import datetime
-from config import CREDENTIALS, BASE_URL, QUERIES, RAW_DIR
+from config import CREDENTIALS, BASE_URL, QUERIES, RAW_DIR, DATA_DIR
 
 
 def _login(session: requests.Session) -> bool:
@@ -32,7 +32,25 @@ def _logout(session: requests.Session):
         pass
 
 
-def download_all(output_dir: str = RAW_DIR, selected_files: list[str] | None = None) -> dict:
+def get_existing_query_files() -> list[str]:
+    """
+    Return query filenames that already exist in either data/raw or data/.
+    This lets us update only datasets that are already part of the project.
+    """
+    existing = []
+    for filename in QUERIES.keys():
+        raw_path = os.path.join(RAW_DIR, filename)
+        root_path = os.path.join(DATA_DIR, filename)
+        if os.path.exists(raw_path) or os.path.exists(root_path):
+            existing.append(filename)
+    return existing
+
+
+def download_all(
+    output_dir: str = RAW_DIR,
+    selected_files: list[str] | None = None,
+    existing_only: bool = False,
+) -> dict:
     """
     Download every query defined in config.QUERIES as CSV.
     Saves files to output_dir.
@@ -52,6 +70,16 @@ def download_all(output_dir: str = RAW_DIR, selected_files: list[str] | None = N
     if selected_files:
         wanted = set(selected_files)
         query_items = [(name, path) for name, path in QUERIES.items() if name in wanted]
+
+    if existing_only:
+        existing = set(get_existing_query_files())
+        query_items = [(name, path) for name, path in query_items if name in existing]
+        print(f"Existing-only mode: {len(query_items)} file(s) selected")
+
+    if not list(query_items):
+        print("No matching files to download.")
+        _logout(session)
+        return {}
 
     for filename, query_path in query_items:
         url = BASE_URL + query_path

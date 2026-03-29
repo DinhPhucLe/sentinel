@@ -1,32 +1,20 @@
 {
-  "total_objects": 29010,
+  "total_objects": 29004,
   "by_type": {
-    "PAYLOAD": 17070,
-    "DEBRIS": 9776,
-    "ROCKET BODY": 2164
+    "PAYLOAD": 17068,
+    "DEBRIS": 9774,
+    "ROCKET BODY": 2162
   },
   "by_zone": {
-    "LEO": 24653,
-    "MEO": 2325,
-    "GEO": 2032
-  },
-  "top_debris_countries": {
-    "PRC": 3539,
-    "US": 3050,
-    "CIS": 2855,
-    "FR": 212,
-    "ITSO": 31,
-    "IND": 28,
-    "JPN": 27,
-    "ESA": 11,
-    "CHBZ": 6,
-    "ORB": 6
+    "LEO": 24650,
+    "MEO": 2324,
+    "GEO": 2030
   },
   "altitude_distribution": {
-    "0-500km": 8083,
-    "500-1000km": 11360,
-    "1000-2000km": 5210,
-    "2000-20000km": 1112,
-    "20000km+": 3245
+    "0-500km": 8102,
+    "500-1000km": 11339,
+    "1000-2000km": 5209,
+    "2000-20000km": 1114,
+    "20000km+": 3240
   }
 }
