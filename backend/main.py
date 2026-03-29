@@ -181,6 +181,125 @@ async def ws_agent_stream(websocket: WebSocket):
 
 
 # ---------------------------------------------------------------------------
+# Chat endpoint
+# ---------------------------------------------------------------------------
+
+@app.post("/api/chat")
+async def chat(body: dict):
+    import re
+    from litellm import acompletion
+
+    message = body.get("message", "")
+    context = body.get("context", {})
+    history = body.get("history", [])
+
+    satellites = context.get("satellites", [])
+    events = context.get("events", [])
+    status = context.get("status", "MONITORING")
+    view = context.get("view", "mission")
+
+    sat_summary = json.dumps(satellites[:10], indent=2) if satellites else "No satellites loaded yet."
+    event_summary = json.dumps(events[:5], indent=2) if events else "No conjunction events active."
+
+    system_prompt = f"""You are Sentinel AI, the intelligent assistant embedded in the Sentinel Orbital Traffic Control dashboard. You help operators understand the live orbital situation and navigate the UI.
+
+## Live System State
+- Pipeline status: {status}
+- Active view: {view}
+- Satellites tracked: {len(satellites)}
+- Active conjunction events: {len(events)}
+
+## Live Satellite Data
+{sat_summary}
+
+## Active Conjunction Events
+{event_summary}
+
+## Dashboard Navigation
+The sidebar has 4 views:
+- **dashboard** — analytics charts, orbital traffic stats, agent response time histograms
+- **mission** — 3D orbit canvas + live agent reasoning log + conjunction triage table + mission control panel
+- **satellites** — card view of all tracked satellites (fuel, altitude, controllability, priority)
+- **alerts** — real-time alert feed sorted by severity
+
+In the Mission view, the 3D OrbitCanvas has:
+- LAYERS button — toggle per-satellite and per-severity conjunction tier visibility (CRITICAL/HIGH/MEDIUM/LOW)
+- SETTINGS button — camera sensitivity, simulation speed, invert controls
+- Click any satellite to open its detail popup (fuel, altitude, active conjunctions)
+
+## Orbital Knowledge
+- LEO (Low Earth Orbit): 160–2,000 km — most congested zone; ISS (~408 km) and Starlink (~550 km) are here
+- MEO (Medium Earth Orbit): 2,000–35,786 km — GPS constellation at ~20,200 km
+- GEO (Geostationary Orbit): 35,786 km — comms satellites, appear stationary above equator
+- Kessler Syndrome: a cascade where collisions create debris that causes more collisions, eventually making an orbital shell unusable
+- TCA (Time of Closest Approach): when two objects reach minimum separation
+- PC (Collision Probability): > 0.01% (1-in-10,000) triggers mandatory avoidance review in real operations; > 0.1% is a critical emergency
+- TLE (Two-Line Element): standard orbital state format. Key fields:
+  - EPOCH: reference time for accuracy
+  - Mean Motion: revolutions per day (higher = lower orbit)
+  - Inclination: orbital tilt relative to equator
+  - BSTAR: atmospheric drag coefficient
+
+## Governance Rules (hard constraints)
+- GPS satellites (priority 1) never maneuver unless no other option
+- Fuel cost per maneuver must not exceed 30% of remaining fuel
+- Miss distance after maneuver must exceed 5 km
+- Uncontrollable debris objects cannot be assigned maneuvers
+
+## Agent Pipeline
+When a scenario is triggered, 5 agents run in sequence:
+1. tracking_agent — assesses event urgency and severity
+2. prediction_agent — contextualises risk (Kessler cascade implications, operator impact)
+3. optimization_agent — simulates 3 delta-v maneuver options, reasons about trade-offs
+4. negotiation_agent — applies operator policy to pick which satellite moves and which burn to execute
+5. governance_agent — validates the decision against the 3 hard safety rules
+
+## Globe Control
+When the user asks to navigate or filter, append ONE action block at the very end of your response (nothing after it):
+<action>{{"type":"SET_VIEW","payload":{{"view":"alerts"}}}}</action>
+
+Available actions:
+- SET_VIEW — navigate to a view. payload: {{"view": "dashboard"|"mission"|"satellites"|"alerts"}}
+- SET_LAYER — toggle a conjunction tier. payload: {{"layer": "CRITICAL"|"HIGH"|"MEDIUM"|"LOW"|"orbitRings", "visible": true|false}}
+
+Only emit an action when the user explicitly asks to navigate or toggle a layer. Never emit an action for informational questions.
+
+## Style
+- Be concise and direct — operators are busy during an incident
+- Use real space-operations terminology
+- Never invent satellite data; use only what is in the live context above
+- For navigation requests, confirm what you did and include the action
+"""
+
+    messages = [{"role": "system", "content": system_prompt}]
+    for msg in history[-10:]:
+        if msg.get("role") in ("user", "assistant") and msg.get("content"):
+            messages.append({"role": msg["role"], "content": msg["content"]})
+    messages.append({"role": "user", "content": message})
+
+    response = await acompletion(
+        model="groq/llama-3.3-70b-versatile",
+        messages=messages,
+        max_tokens=600,
+        temperature=0.3,
+    )
+
+    text = response.choices[0].message.content or ""
+
+    # Extract optional action block
+    action = None
+    match = re.search(r"<action>(.*?)</action>", text, re.DOTALL)
+    if match:
+        try:
+            action = json.loads(match.group(1))
+        except Exception:
+            pass
+        text = text.replace(match.group(0), "").strip()
+
+    return {"response": text, "action": action}
+
+
+# ---------------------------------------------------------------------------
 # Health check
 # ---------------------------------------------------------------------------
 
