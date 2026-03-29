@@ -2,16 +2,28 @@ import { useState, useRef, useEffect } from 'react'
 
 const WELCOME = "I'm Sentinel AI. Ask me about satellites, collision risks, orbital zones, or say things like \"show me alerts\" or \"what is Kessler Syndrome?\""
 
-export default function ChatBot({ satellites = [], events = [], status = 'MONITORING', view = 'mission', onAction }) {
+export default function ChatBot({ satellites = [], events = [], status = 'MONITORING', view = 'mission', onAction, agentMessages = [] }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([{ role: 'assistant', content: WELCOME }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [unread, setUnread] = useState(0)
+  const prevStatusRef = useRef(status)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
+  // Nudge the user to open chat when pipeline finishes
+  useEffect(() => {
+    const prev = prevStatusRef.current
+    prevStatusRef.current = status
+    if (!open && (status === 'AVOIDED' || status === 'ERROR') && prev !== status) {
+      setUnread(u => u + 1)
+    }
+  }, [status, open])
+
   useEffect(() => {
     if (open) {
+      setUnread(0)
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
       inputRef.current?.focus()
     }
@@ -33,8 +45,10 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
           history: messages.slice(-10),
         }),
       })
+      if (!res.ok) throw new Error(await res.text())
       const data = await res.json()
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
+      if (!open) setUnread(u => u + 1)
       if (data.action && onAction) onAction(data.action)
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Connection error — is the backend running?' }])
@@ -188,23 +202,36 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
       )}
 
       {/* ── Floating bubble ────────────────────────────────────────── */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        title="Sentinel AI Assistant"
-        style={{
-          width: '52px', height: '52px', borderRadius: '50%',
-          background: open ? 'var(--bg-surface)' : 'var(--accent-dim)',
-          border: '1px solid ' + (open ? 'rgba(94,170,187,0.3)' : 'var(--accent-dim)'),
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
-          transition: 'all 0.2s var(--ease-out)',
-        }}
-      >
-        {open
-          ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-heading)" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-        }
-      </button>
+      <div style={{ position: 'relative' }}>
+        {unread > 0 && !open && (
+          <div style={{
+            position: 'absolute', top: '-4px', right: '-4px', zIndex: 1,
+            width: '18px', height: '18px', borderRadius: '50%',
+            background: 'var(--status-bad)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '10px', fontWeight: '700', color: 'white',
+            fontFamily: 'var(--font-mono)',
+            border: '2px solid var(--bg-deep)',
+          }}>{unread}</div>
+        )}
+        <button
+          onClick={() => setOpen(o => !o)}
+          title="Sentinel AI Assistant"
+          style={{
+            width: '52px', height: '52px', borderRadius: '50%',
+            background: open ? 'var(--bg-surface)' : 'var(--accent-dim)',
+            border: '1px solid ' + (open ? 'rgba(94,170,187,0.3)' : 'var(--accent-dim)'),
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+            transition: 'all 0.2s var(--ease-out)',
+          }}
+        >
+          {open
+            ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-heading)" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+          }
+        </button>
+      </div>
     </div>
   )
 }
