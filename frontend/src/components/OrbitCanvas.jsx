@@ -819,8 +819,34 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
         s.scene.add(cone); s.simArrows.push(cone)
       }
 
-      // Hide normal orbit lines during sim (grey sim lines replace them)
+      // Hide all orbit lines (grey sim-specific lines replace the two active ones)
       Object.entries(s.orbitLines).forEach(([, line]) => { if (line) line.visible = false })
+
+      // Isolate: hide every satellite mesh except the two being simulated
+      Object.entries(s.sats).forEach(([satId, obj]) => {
+        if (obj) obj.mesh.visible = satId === focusId || satId === partnerId
+      })
+
+      // Hide all conjunction lines except the one linking the focused pair
+      Object.values(s.conjLines).forEach(line => {
+        if (!line) return
+        const ev = line._eventData
+        const isFocused = ev?.sat_a?.id === focusId || ev?.sat_b?.id === focusId ||
+                          ev?.sat_a?.id === partnerId || ev?.sat_b?.id === partnerId
+        line.visible = isFocused
+      })
+
+      // Show only the conjunction edge between the two active satellites; hide all others
+      const activeSatAId = simMode.satAId
+      const activeSatBId = simMode.satBId
+      Object.values(s.conjLines).forEach(line => {
+        if (!line?._eventData) return
+        const { sat_a, sat_b } = line._eventData
+        const isActive =
+          (sat_a?.id === activeSatAId && sat_b?.id === activeSatBId) ||
+          (sat_a?.id === activeSatBId && sat_b?.id === activeSatAId)
+        line.visible = isActive
+      })
 
       setFocusSatId(focusId)
     } else {
