@@ -2,15 +2,13 @@
 ADK orchestrator — SequentialAgent pipeline with streaming WebSocket support.
 
 Pipeline: tracking → prediction → optimization → negotiation → governance
-
-Each agent's output is stored in session state via output_key and is visible
-to subsequent agents through the conversation history.
+If governance rejects, agents automatically reroute and propose an alternative.
 """
 
 import asyncio
 import uuid
 from datetime import datetime, timezone
-from typing import AsyncGenerator, Callable, Any
+from typing import Callable, Any
 
 from google.adk.agents import SequentialAgent
 from google.adk.runners import Runner
@@ -30,7 +28,6 @@ _SPACE_CONTEXT = get_space_environment_context()
 
 APP_NAME = "orbital_traffic_control"
 
-# Agent display order for streaming — maps author name to label
 AGENT_ORDER = [
     "tracking_agent",
     "prediction_agent",
@@ -39,7 +36,6 @@ AGENT_ORDER = [
     "governance_agent",
 ]
 
-# Lazily initialised — built on first call to run_pipeline_streaming
 _pipeline = None
 _session_service = None
 _runner = None
@@ -72,12 +68,85 @@ def _ts() -> str:
 
 
 def _extract_text(event) -> str:
-    """Pull plain text out of an ADK Event content object."""
     if not event.content or not event.content.parts:
         return ""
     return "".join(
         part.text for part in event.content.parts if hasattr(part, "text") and part.text
     )
+
+
+def _is_validated(gov_output: str) -> bool:
+    low = gov_output.lower()
+    return ("validated: true" in low or "✓ approved" in low or "approved" in low) and "rejected" not in low
+
+
+async def _run_pass(
+    runner: Runner,
+    brief: str,
+    user_id: str,
+    emit: Callable[[dict], Any],
+    attempt: int,
+) -> tuple[str, str]:
+    """
+    Run one full pipeline pass. Returns (governance_output, negotiation_output).
+    Streams agent_log events to the client as each agent completes.
+    """
+    status_map = {
+        "tracking_agent":     "ANALYZING",
+        "prediction_agent":   "ANALYZING",
+        "optimization_agent": "ANALYZING",
+        "negotiation_agent":  "DECIDING",
+        "governance_agent":   "VALIDATING",
+    }
+
+    session_id = f"run-{uuid.uuid4().hex[:8]}-a{attempt}"
+    await _session_service.create_session(
+        app_name=APP_NAME,
+        user_id=user_id,
+        session_id=session_id,
+    )
+
+    seen_agents: set[str] = set()
+    buffers: dict[str, list[str]] = {}
+
+    new_message = genai_types.Content(
+        role="user",
+        parts=[genai_types.Part(text=brief)],
+    )
+
+    async for event in runner.run_async(
+        user_id=user_id,
+        session_id=session_id,
+        new_message=new_message,
+    ):
+        author = event.author or ""
+
+        if author in AGENT_ORDER and author not in seen_agents:
+            seen_agents.add(author)
+            await emit({"type": "status", "status": status_map.get(author, "ANALYZING"), "timestamp": _ts()})
+
+        text = _extract_text(event)
+        if not text:
+            continue
+
+        buffers.setdefault(author, []).append(text)
+
+        if event.is_final_response() and author in AGENT_ORDER:
+            full = "".join(buffers.get(author, [])).strip()
+            await emit({
+                "type": "agent_log",
+                "agent": author,
+                "message": full,
+                "timestamp": _ts(),
+            })
+            await asyncio.sleep(0.1)
+
+    session = await _session_service.get_session(
+        app_name=APP_NAME, user_id=user_id, session_id=session_id
+    )
+    gov_out = session.state.get("governance_validation", "") if session else ""
+    neg_out = session.state.get("negotiation_decision", "") if session else ""
+    return gov_out, neg_out
 
 
 async def run_pipeline_streaming(
@@ -86,15 +155,13 @@ async def run_pipeline_streaming(
     event_id: str = None,
 ) -> None:
     """
-    Run the full ADK agent pipeline and call emit() with each WebSocket message.
+    Run the agent pipeline with automatic rerouting if governance rejects.
 
-    emit() receives dicts:
-      {"type": "agent_log", "agent": "...", "message": "...", "timestamp": "..."}
-      {"type": "decision", "data": {...}}
-      {"type": "status", "status": "..."}
+    Attempt 1 → agents propose a solution
+    If rejected → emit system REROUTING message → Attempt 2 with rejection context
+    If still rejected → emit ERROR
     """
-    # --- Primary event (always scripted, always SAT-001 vs SAT-002) ---
-    events = get_conjunction_events()
+    events = get_kessler_cascade_events() if kessler else get_conjunction_events()
     if event_id:
         events = [ev for ev in events if ev.id == event_id] or events
 
@@ -108,7 +175,6 @@ async def run_pipeline_streaming(
             f"ctrl_a={ev.sat_a.controllable} ctrl_b={ev.sat_b.controllable}"
         )
 
-    # Pre-compute maneuver simulations for the primary event (SAT-002)
     maneuver_lines = []
     for dv in [1.0, 5.0, 15.0]:
         result = simulate_maneuver("SAT-002", dv)
@@ -118,137 +184,70 @@ async def run_pipeline_streaming(
             f"status={result.get('status', 'ok')}"
         )
 
-    # --- Kessler cascade: real CDMs or scripted fallback ---
-    if kessler:
-        real_events = get_real_kessler_events(top_n=5)
-        if real_events:
-            cascade_lines = ["SECONDARY CONJUNCTION WARNINGS (real NORAD CDM data):"]
-            for ev in real_events:
-                cascade_lines.append(
-                    f"- {ev['id']}: {ev['sat_a_name']} ({ev['sat_a_type']}, "
-                    f"ctrl={ev['sat_a_controllable']}) ↔ "
-                    f"{ev['sat_b_name']} ({ev['sat_b_type']}, "
-                    f"ctrl={ev['sat_b_controllable']}) | "
-                    f"prob={ev['collision_probability']:.4%} | "
-                    f"TCA={ev['time_to_closest_approach_hours']:.1f}h | "
-                    f"miss={ev['miss_distance_km']:.0f}km"
-                )
-            cascade_section = "\n".join(cascade_lines)
-        else:
-            # Fallback to scripted cascade if dataset unavailable
-            cascade_events = get_kessler_cascade_events()
-            cascade_lines = ["SECONDARY CONJUNCTION WARNINGS (simulated):"]
-            for ev in cascade_events:
-                cascade_lines.append(
-                    f"- {ev.id}: {ev.sat_a.name} ↔ {ev.sat_b.name} | "
-                    f"prob={ev.collision_probability:.0%} | "
-                    f"TCA={ev.time_to_closest_approach_hours:.1f}h | "
-                    f"miss={ev.miss_distance_km:.2f}km"
-                )
-            cascade_section = "\n".join(cascade_lines)
-    else:
-        cascade_section = ""
-
-    # --- Assemble the full brief ---
-    sections = [
-        _SPACE_CONTEXT,
-        "",
-        "ACTIVE CONJUNCTION EVENTS — assess immediately:",
-        "\n".join(event_lines),
-        "",
-        "PRE-COMPUTED MANEUVER OPTIONS FOR SAT-002 (Starlink, 62% fuel remaining):",
-        "\n".join(maneuver_lines),
-    ]
-    if cascade_section:
-        sections += ["", cascade_section]
-
-    sections += [
-        "",
-        "Safety minimum: miss distance > 5 km, fuel cost < 30% of remaining fuel.",
-        "Respond with urgency. These are live events.",
-    ]
-
-    initial_brief = "\n".join(sections)
-
-    # Initialise runner lazily (first call only — avoids blocking uvicorn startup)
-    runner = _get_runner()
-
-    # Create a fresh session per run
-    user_id = "operator"
-    session_id = f"run-{uuid.uuid4().hex[:8]}"
-    await _session_service.create_session(
-        app_name=APP_NAME,
-        user_id=user_id,
-        session_id=session_id,
+    base_brief = (
+        "ACTIVE CONJUNCTION EVENTS — assess immediately:\n"
+        + "\n".join(event_lines)
+        + "\n\nPRE-COMPUTED MANEUVER OPTIONS FOR SAT-002 (Starlink, 62% fuel remaining):\n"
+        + "\n".join(maneuver_lines)
+        + "\n\nSafety minimum: miss distance > 5 km, fuel cost < 30% of remaining fuel."
     )
+
+    runner = _get_runner()
+    user_id = "operator"
 
     await emit({"type": "status", "status": "ANALYZING", "timestamp": _ts()})
 
-    # Status transitions per agent
-    status_map = {
-        "tracking_agent":     "ANALYZING",
-        "prediction_agent":   "ANALYZING",
-        "optimization_agent": "ANALYZING",
-        "negotiation_agent":  "DECIDING",
-        "governance_agent":   "VALIDATING",
-    }
+    gov_output = ""
+    neg_output = ""
+    validated = False
 
-    seen_agents: set[str] = set()
-    current_agent_buffer: dict[str, list[str]] = {}
-
-    new_message = genai_types.Content(
-        role="user",
-        parts=[genai_types.Part(text=initial_brief)],
-    )
-
-    async for event in runner.run_async(
-        user_id=user_id,
-        session_id=session_id,
-        new_message=new_message,
-    ):
-        author = event.author or ""
-
-        # Emit status transition when a new agent starts
-        if author in AGENT_ORDER and author not in seen_agents:
-            seen_agents.add(author)
-            status = status_map.get(author, "ANALYZING")
-            await emit({"type": "status", "status": status, "timestamp": _ts()})
-
-        text = _extract_text(event)
-        if not text:
-            continue
-
-        # Buffer partial chunks per agent
-        if author not in current_agent_buffer:
-            current_agent_buffer[author] = []
-        current_agent_buffer[author].append(text)
-
-        # On final response from an agent, emit the full message
-        if event.is_final_response() and author in AGENT_ORDER:
-            full_message = "".join(current_agent_buffer.get(author, []))
+    for attempt in range(2):
+        if attempt == 1:
+            # Reroute: inject rejection context so agents pick a different maneuver
             await emit({
                 "type": "agent_log",
-                "agent": author,
-                "message": full_message.strip(),
+                "agent": "system",
+                "message": (
+                    "⚠ REROUTING — ALTERNATIVE SOLUTION REQUIRED\n"
+                    "─────────────────────────────────────────────\n"
+                    "Governance rejected the proposed maneuver.\n"
+                    "Agents are re-evaluating all options.\n\n"
+                    f"Rejected decision:\n{neg_output[:400]}\n\n"
+                    f"Rejection reason:\n{gov_output[:400]}"
+                ),
                 "timestamp": _ts(),
             })
-            # Small pause so the UI can animate each entry
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.3)
 
-    # Emit the governance output as the final decision signal
-    session = await _session_service.get_session(
-        app_name=APP_NAME, user_id=user_id, session_id=session_id
-    )
-    governance_output = session.state.get("governance_validation", "") if session else ""
-    negotiation_output = session.state.get("negotiation_decision", "") if session else ""
+            brief = (
+                base_brief
+                + "\n\n"
+                + "─" * 48
+                + "\nPREVIOUS DECISION REJECTED — FIND ALTERNATIVE\n"
+                + "─" * 48
+                + f"\nThe following maneuver was proposed but FAILED governance:\n{neg_output}\n\n"
+                + f"Governance rejection reason:\n{gov_output}\n\n"
+                + "You MUST select a different maneuver option. "
+                + "The rejected option is off the table. "
+                + "Consider higher delta-v for greater miss distance margin, "
+                + "or re-examine whether a different satellite should maneuver. "
+                + "Do not repeat the same choice."
+            )
+            await emit({"type": "status", "status": "ANALYZING", "timestamp": _ts()})
+        else:
+            brief = base_brief
 
-    validated = "validated: true" in governance_output.lower() or "approved" in governance_output.lower()
+        gov_output, neg_output = await _run_pass(runner, brief, user_id, emit, attempt)
+        validated = _is_validated(gov_output)
+
+        if validated:
+            break
 
     await emit({
         "type": "decision",
         "data": {
-            "negotiation_decision": negotiation_output,
-            "governance_validation": governance_output,
+            "negotiation_decision": neg_output,
+            "governance_validation": gov_output,
             "validated": validated,
         },
         "timestamp": _ts(),
