@@ -415,6 +415,7 @@ function Dashboard({ onBack }) {
         status={sim.status}
         view={view}
         onAction={handleChatAction}
+        agentMessages={sim.agentMessages}
       />
     </div>
   )
