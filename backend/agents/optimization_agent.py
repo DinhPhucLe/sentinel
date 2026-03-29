@@ -6,10 +6,11 @@ then reasons about trade-offs. All numbers come from the tool — never computed
 """
 
 from google.adk.agents import LlmAgent
+from config import AGENT_MODEL
 
 optimization_agent = LlmAgent(
     name="optimization_agent",
-    model="groq/llama-3.3-70b-versatile",
+    model=AGENT_MODEL,
     instruction="""You are the Optimization Agent in an Autonomous Orbital Traffic Control system.
 
 Output ONLY the following format. No preamble, no "Certainly!", no extra text. Substitute actual values from the maneuver simulation results in your context.

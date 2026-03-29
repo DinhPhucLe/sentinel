@@ -4,7 +4,7 @@ import AgentLog from './components/AgentLog'
 import OrbitCanvas from './components/OrbitCanvas'
 import AnalyticsView from './components/AnalyticsView'
 import LandingPage from './components/LandingPage'
-import { SentinelMark } from './components/SentinelLogo'
+import SentinelLogo, { SentinelMark } from './components/SentinelLogo'
 import TriageTable from './components/TriageTable'
 import MissionPanel from './components/MissionPanel'
 import ManeuverQueue from './components/ManeuverQueue'
@@ -101,12 +101,7 @@ function Header({ connected, status, clock }) {
       background: 'var(--bg-elevated)',
       borderBottom: '1px solid var(--border-subtle)',
     }}>
-      <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-heading)', fontFamily: 'var(--font-display)', letterSpacing: '0.14em' }}>
-        SENTINEL
-      </span>
-      <span style={{ fontSize: '9px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-display)', letterSpacing: '0.1em' }}>
-        ORBITAL TRAFFIC CONTROL
-      </span>
+      <SentinelLogo size={14} animate={false} />
       <div style={{ flex: 1 }} />
       <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{clock}</span>
       <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: '600', color: STATUS_COLORS[status] || 'var(--accent)', letterSpacing: '0.08em' }}>

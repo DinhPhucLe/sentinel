@@ -6,10 +6,11 @@ with satellite priority, debris implications, and Kessler syndrome risk.
 """
 
 from google.adk.agents import LlmAgent
+from config import AGENT_MODEL
 
 prediction_agent = LlmAgent(
     name="prediction_agent",
-    model="groq/llama-3.3-70b-versatile",
+    model=AGENT_MODEL,
     instruction="""You are the Prediction Agent in an Autonomous Orbital Traffic Control system.
 
 Output ONLY the following format. No preamble, no "Certainly!", no extra text. Substitute actual values from the data in 'tracking_assessment'.

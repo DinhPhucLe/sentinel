@@ -34,33 +34,137 @@ function ProbabilityRing({ probability }) {
   )
 }
 
+function formatDecisionText(raw) {
+  if (!raw) return []
+  return raw.split('\n').filter(l => l.trim()).map(line => {
+    const trimmed = line.trim()
+    // Key: Value lines
+    const kv = trimmed.match(/^([A-Z][A-Za-z\s/()]+?)\s*:\s*(.+)$/)
+    if (kv) return { type: 'kv', key: kv[1], value: kv[2] }
+    // Bullet lines
+    if (/^[-•✓✗]/.test(trimmed)) return { type: 'bullet', text: trimmed.replace(/^[-•]\s*/, '') }
+    // Section headers
+    if (/^[A-Z][A-Z\s\-_]{3,}$/.test(trimmed)) return { type: 'header', text: trimmed }
+    return { type: 'text', text: trimmed }
+  })
+}
+
 function DecisionCard({ decision }) {
   if (!decision) return null
   const validated = decision.validated
   const color = validated ? '#34d399' : '#f87171'
-  const border = validated ? '#34d39933' : '#f8717133'
   const bg = validated ? '#0a1f12' : '#1f0a0a'
+
+  const negLines = formatDecisionText(decision.negotiation_decision)
+  const govLines = formatDecisionText(decision.governance_validation)
+
   return (
-    <div style={{ padding: '10px', background: bg, border: `1px solid ${border}`, borderRadius: '5px', fontSize: '11px' }}>
-      <div style={{ color, fontWeight: 'bold', marginBottom: '6px', letterSpacing: '0.08em' }}>
-        {validated ? '✓ MANEUVER APPROVED' : '✗ MANEUVER REJECTED'}
+    <div style={{ borderRadius: '6px', overflow: 'hidden', border: `1px solid ${color}22` }}>
+      {/* Status header */}
+      <div style={{
+        padding: '8px 12px', background: `${color}12`,
+        display: 'flex', alignItems: 'center', gap: '8px',
+        borderBottom: `1px solid ${color}18`,
+      }}>
+        <span style={{ fontSize: '13px' }}>{validated ? '✓' : '✗'}</span>
+        <span style={{
+          fontSize: '10px', fontWeight: '700', color,
+          letterSpacing: '0.1em', fontFamily: 'var(--font-display)',
+        }}>
+          {validated ? 'MANEUVER APPROVED' : 'MANEUVER REJECTED'}
+        </span>
       </div>
-      {decision.negotiation_decision && (
-        <div style={{ marginBottom: '6px' }}>
-          <div style={{ color: '#475569', fontSize: '10px', marginBottom: '2px' }}>NEGOTIATION</div>
-          <div style={{ color: '#94a3b8', lineHeight: 1.5 }}>
-            {decision.negotiation_decision.slice(0, 280)}{decision.negotiation_decision.length > 280 ? '…' : ''}
+
+      <div style={{ padding: '10px 12px', background: bg }}>
+        {/* Negotiation section */}
+        {negLines.length > 0 && (
+          <div style={{ marginBottom: govLines.length ? '10px' : 0 }}>
+            <div style={{
+              fontSize: '9px', fontWeight: '600', color: '#64748b',
+              letterSpacing: '0.12em', fontFamily: 'var(--font-display)',
+              marginBottom: '6px', textTransform: 'uppercase',
+            }}>
+              Negotiation Decision
+            </div>
+            <DecisionLines lines={negLines} />
           </div>
-        </div>
-      )}
-      {decision.governance_validation && (
-        <div>
-          <div style={{ color: '#475569', fontSize: '10px', marginBottom: '2px' }}>GOVERNANCE</div>
-          <div style={{ color: '#94a3b8', lineHeight: 1.5 }}>
-            {decision.governance_validation.slice(0, 200)}{decision.governance_validation.length > 200 ? '…' : ''}
+        )}
+
+        {/* Divider */}
+        {negLines.length > 0 && govLines.length > 0 && (
+          <div style={{ height: '1px', background: '#1e3a5f', margin: '0 0 10px' }} />
+        )}
+
+        {/* Governance section */}
+        {govLines.length > 0 && (
+          <div>
+            <div style={{
+              fontSize: '9px', fontWeight: '600', color: '#64748b',
+              letterSpacing: '0.12em', fontFamily: 'var(--font-display)',
+              marginBottom: '6px', textTransform: 'uppercase',
+            }}>
+              Safety Validation
+            </div>
+            <DecisionLines lines={govLines} />
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DecisionLines({ lines }) {
+  return (
+    <div style={{ fontSize: '10.5px', lineHeight: 1.6, fontFamily: 'var(--font-mono)' }}>
+      {lines.map((line, i) => {
+        if (line.type === 'header') {
+          return (
+            <div key={i} style={{
+              fontWeight: '700', color: '#94a3b8', fontSize: '10px',
+              letterSpacing: '0.08em', margin: '6px 0 3px',
+              fontFamily: 'var(--font-display)',
+            }}>
+              {line.text}
+            </div>
+          )
+        }
+        if (line.type === 'kv') {
+          return (
+            <div key={i} style={{ display: 'flex', gap: '6px', margin: '2px 0' }}>
+              <span style={{ color: '#64748b', fontWeight: '600', fontSize: '10px', whiteSpace: 'nowrap' }}>
+                {line.key}
+              </span>
+              <span style={{ color: '#cbd5e1', fontWeight: '500' }}>{line.value}</span>
+            </div>
+          )
+        }
+        if (line.type === 'bullet') {
+          const isPass = /✓|PASS|approved/i.test(line.text)
+          const isFail = /✗|FAIL|rejected/i.test(line.text)
+          return (
+            <div key={i} style={{ display: 'flex', gap: '6px', margin: '2px 0', paddingLeft: '2px' }}>
+              <span style={{
+                color: isPass ? '#34d399' : isFail ? '#f87171' : '#64748b',
+                flexShrink: 0, fontSize: '7px', marginTop: '4px',
+              }}>
+                {isPass ? '✓' : isFail ? '✗' : '●'}
+              </span>
+              <span style={{
+                color: isPass ? '#34d399' : isFail ? '#f87171' : '#94a3b8',
+                fontWeight: (isPass || isFail) ? '600' : '400',
+              }}>
+                {line.text}
+              </span>
+            </div>
+          )
+        }
+        // Default text
+        return (
+          <div key={i} style={{ color: '#94a3b8', margin: '1px 0' }}>
+            {line.text}
+          </div>
+        )
+      })}
     </div>
   )
 }
