@@ -193,7 +193,7 @@ function ExpandedOverlay({ children, onClose, title }) {
   )
 }
 
-function MissionView({ sim }) {
+function MissionView({ sim, layerOverrides }) {
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [simMode, setSimMode] = useState(null)
   const [maneuverQueue, setManeuverQueue] = useState([])
@@ -244,6 +244,7 @@ function MissionView({ sim }) {
             status={sim.status}
             simMode={simMode}
             agentMessages={sim.agentMessages}
+            layerOverrides={layerOverrides}
             onEndSim={handleEndSim}
           />
         </div>
@@ -410,7 +411,7 @@ function Dashboard({ onBack }) {
           overflow: view === 'mission' ? 'hidden' : 'auto',
         }}>
           {view === 'dashboard'   && <AnalyticsView sim={sim} />}
-          {view === 'mission'     && <MissionView sim={sim} />}
+          {view === 'mission'     && <MissionView sim={sim} layerOverrides={chatLayerOverrides} />}
           {view === 'satellites'  && <SatellitesView satellites={sim.satellites} />}
           {view === 'alerts'      && <AlertsView />}
         </main>

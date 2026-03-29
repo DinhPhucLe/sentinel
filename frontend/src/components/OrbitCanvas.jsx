@@ -17,7 +17,8 @@ const SAT_COLORS = {
   JAXA: 0x00B4E0, ROSCOSMOS: 0xE07040, UNKNOWN: 0x606870,
 }
 const SAT_HEX = {
-  GPS: '#00C8F0', STARLINK: '#90B0C0', ISS: '#D0D8E0', DEBRIS: '#505860', UNKNOWN: '#606870',
+  GPS: '#00C8F0', STARLINK: '#90B0C0', ISS: '#D0D8E0', DEBRIS: '#505860',
+  JAXA: '#00B4E0', ROSCOSMOS: '#E07040', UNKNOWN: '#606870',
 }
 
 const CONJ_TIERS = [
@@ -320,7 +321,7 @@ const AGENT_META_CANVAS = {
   system:             { color: '#f87171', label: 'SYS' },
 }
 
-export default function OrbitCanvas({ satellites, events, decision, status, simMode, agentMessages, onEndSim }) {
+export default function OrbitCanvas({ satellites, events, decision, status, simMode, agentMessages, layerOverrides, onEndSim }) {
   const mountRef = useRef(null)
   const stateRef = useRef({
     renderer: null, scene: null, camera: null, animId: null, controls: null,
@@ -875,6 +876,18 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
 
     setFocusSatId(newFocus)
   }, [simMode, satellites])
+
+  // ── External layer overrides (from chat assistant) ─────────────────
+  useEffect(() => {
+    if (!layerOverrides?.length) return
+    const { layer, visible } = layerOverrides[layerOverrides.length - 1]
+    setLayers(prev => {
+      if (layer === 'orbitRings') return { ...prev, orbitRings: visible }
+      if (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(layer))
+        return { ...prev, conjTiers: { ...prev.conjTiers, [layer]: visible } }
+      return prev
+    })
+  }, [layerOverrides?.length])
 
   // ── Settings sync ──────────────────────────────────────────────────
   useEffect(() => {

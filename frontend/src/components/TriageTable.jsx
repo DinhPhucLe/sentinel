@@ -1,6 +1,6 @@
 function ProbBadge({ prob }) {
   const pct = (prob * 100).toFixed(2)
-  const color = prob >= 0.7 ? '#f87171' : prob >= 0.4 ? '#fb923c' : prob >= 0.2 ? '#fbbf24' : '#34d399'
+  const color = prob >= 0.01 ? '#f87171' : prob >= 0.001 ? '#fb923c' : prob >= 0.0001 ? '#fbbf24' : '#34d399'
   return (
     <span style={{
       display: 'inline-block',

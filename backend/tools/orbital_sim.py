@@ -30,6 +30,7 @@ def _load_satellites() -> dict[str, Satellite]:
             position=tuple(s["position"]),
             velocity=tuple(s["velocity"]),
             controllable=s["controllable"],
+            inclination=s.get("inclination", 0.0),
         )
         satellites[sat.id] = sat
     return satellites

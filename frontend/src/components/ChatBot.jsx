@@ -3,7 +3,6 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 const WELCOME = "I'm **Sentinel AI**, your orbital traffic assistant.\n\nAsk me about *satellites*, *collision risks*, or *orbital zones* — or try commands like **\"show me alerts\"** or **\"hide critical conjunctions\"**."
-const BOT_IMAGE_CANDIDATES = ['/chatbot-logo.png', '/chatbot_logo.png', '/chatbot_log.png']
 
 // ── Themed markdown components ────────────────────────────────────────
 const MD_COMPONENTS = {
@@ -38,7 +37,6 @@ const MD_COMPONENTS = {
     ? <code style={{ background: 'var(--bg-deep)', padding: '1px 5px', borderRadius: '3px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--accent)' }}>{children}</code>
     : <pre style={{ background: 'var(--bg-deep)', padding: '8px 10px', borderRadius: '6px', margin: '6px 0', overflowX: 'auto', border: '1px solid var(--border-subtle)' }}><code style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--accent-dim)' }}>{children}</code></pre>,
   hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '8px 0' }} />,
-  // ── Table rendered as a proper UI card ───────────────────────────────
   table: ({ children }) => (
     <div style={{ margin: '8px 0', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(94,170,187,0.2)' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>{children}</table>
@@ -62,25 +60,40 @@ const MD_COMPONENTS = {
   ),
 }
 
+// Inline avatar — no external image required
+function BotAvatar({ size }) {
+  const cx = size / 2, cy = size / 2, r = size * 0.34
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      background: 'linear-gradient(135deg, #1a2640 0%, #0e1a2e 50%, #1a3050 100%)',
+      border: '1px solid rgba(94,170,187,0.28)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      overflow: 'hidden',
+    }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <defs>
+          <linearGradient id="ba-g" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#d0e8f0" />
+            <stop offset="100%" stopColor="#78b8cc" />
+          </linearGradient>
+        </defs>
+        <ellipse cx={cx} cy={cy} rx={r * 1.1} ry={r * 0.52}
+          fill="none" stroke="rgba(94,170,187,0.3)" strokeWidth="0.7"
+          transform={`rotate(-20 ${cx} ${cy})`} />
+        <text x={cx} y={cy + size * 0.14} textAnchor="middle"
+          style={{ fontSize: `${size * 0.46}px`, fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fill: 'url(#ba-g)' }}>
+          S
+        </text>
+      </svg>
+    </div>
+  )
+}
+
 // ── Typing animation config ───────────────────────────────────────────
 const TYPING_SPEED = 10  // chars per tick
 const TYPING_INTERVAL = 18 // ms
 const LOADING_PHASES = ['Thinking', 'Analyzing', 'Drafting response']
-
-function BotAvatar({ style = {}, alt = 'Sentinel' }) {
-  const [imgSrc, setImgSrc] = useState(BOT_IMAGE_CANDIDATES[0])
-  const [idx, setIdx] = useState(0)
-
-  const handleError = () => {
-    const next = idx + 1
-    if (next < BOT_IMAGE_CANDIDATES.length) {
-      setIdx(next)
-      setImgSrc(BOT_IMAGE_CANDIDATES[next])
-    }
-  }
-
-  return <img src={imgSrc} onError={handleError} alt={alt} style={style} />
-}
 
 // ── Component ─────────────────────────────────────────────────────────
 export default function ChatBot({ satellites = [], events = [], status = 'MONITORING', view = 'mission', onAction, agentMessages = [] }) {
@@ -171,13 +184,16 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
     setInput('')
     setMessages(prev => [...prev, { role: 'user', content: text }])
     setLoading(true)
+    const agentActivity = agentMessages?.length
+      ? agentMessages.slice(-5).map(m => `[${m.agent}]: ${(m.message || '').slice(0, 200)}`).join('\n')
+      : ''
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
-          context: { satellites, events, status, view },
+          context: { satellites, events, status, view, agentActivity },
           history: messages.slice(-10),
         }),
       })
@@ -219,10 +235,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
             background: 'linear-gradient(135deg, var(--bg-deep) 0%, #0a1520 100%)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <BotAvatar
-                alt="Sentinel"
-                style={{ width: '34px', height: '34px', borderRadius: '8px', objectFit: 'cover', border: '1px solid rgba(94,170,187,0.2)' }}
-              />
+              <BotAvatar size={34} />
               <div>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-heading)', fontFamily: 'var(--font-display)', letterSpacing: '0.14em' }}>
                   SENTINEL AI
@@ -260,7 +273,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
             {messages.map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '7px' }}>
                 {m.role === 'assistant' && (
-                  <BotAvatar alt="" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginBottom: '2px', border: '1px solid rgba(94,170,187,0.15)' }} />
+                  <BotAvatar size={24} />
                 )}
                 <div style={{
                   maxWidth: '82%',
@@ -291,10 +304,10 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
               </div>
             ))}
 
-            {/* Animated loading dots */}
+            {/* Animated loading indicator */}
             {loading && (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '7px' }}>
-                <BotAvatar alt="" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(94,170,187,0.15)' }} />
+                <BotAvatar size={24} />
                 <div style={{ padding: '10px 13px', borderRadius: '3px 14px 14px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', minWidth: '180px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
                     <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
@@ -425,7 +438,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
                 </svg>
               </div>
             )
-            : <BotAvatar alt="Sentinel AI" style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover' }} />
+            : <BotAvatar size={52} />
           }
         </button>
       </div>
