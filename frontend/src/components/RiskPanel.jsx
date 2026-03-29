@@ -85,29 +85,41 @@ function StatusBadge({ status }) {
 
 function DecisionCard({ decision }) {
   if (!decision) return null
-  const mo = decision.chosen_maneuver
+  const validated = decision.validated
+  const headerColor = validated ? '#34d399' : '#f87171'
+  const borderColor = validated ? '#34d39944' : '#f8717144'
+  const bg = validated ? '#0a2a1a' : '#2a0a0a'
   return (
     <div style={{
       marginTop: '12px',
       padding: '12px',
-      background: '#0a2a1a',
-      border: '1px solid #34d39944',
+      background: bg,
+      border: `1px solid ${borderColor}`,
       borderRadius: '6px',
       fontSize: '12px',
     }}>
-      <div style={{ color: '#34d399', fontWeight: 'bold', marginBottom: '8px', letterSpacing: '0.08em' }}>
-        ✓ MANEUVER APPROVED
+      <div style={{ color: headerColor, fontWeight: 'bold', marginBottom: '8px', letterSpacing: '0.08em' }}>
+        {validated ? '✓ MANEUVER APPROVED' : '✗ MANEUVER REJECTED'}
       </div>
-      <div style={{ color: '#94a3b8', lineHeight: 1.6 }}>
-        <div><span style={{ color: '#e0f0ff' }}>Satellite:</span> {mo.sat_id}</div>
-        <div><span style={{ color: '#e0f0ff' }}>Delta-v:</span> {mo.delta_v} m/s</div>
-        <div><span style={{ color: '#e0f0ff' }}>New miss dist:</span> {mo.new_miss_distance_km.toFixed(1)} km</div>
-        <div><span style={{ color: '#e0f0ff' }}>Fuel cost:</span> {(mo.fuel_cost * 100).toFixed(2)}%</div>
-        <div style={{ marginTop: '8px', color: '#64748b', fontSize: '11px' }}>
-          {decision.rationale?.slice(0, 200)}...
+      {decision.negotiation_decision && (
+        <div style={{ color: '#94a3b8', lineHeight: 1.6, marginBottom: '8px' }}>
+          <div style={{ color: '#64748b', fontSize: '11px', marginBottom: '4px' }}>NEGOTIATION</div>
+          <div style={{ color: '#cbd5e1', fontSize: '11px', whiteSpace: 'pre-wrap' }}>
+            {decision.negotiation_decision.slice(0, 400)}
+            {decision.negotiation_decision.length > 400 ? '…' : ''}
+          </div>
         </div>
-      </div>
-      {decision.validated && (
+      )}
+      {decision.governance_validation && (
+        <div style={{ color: '#94a3b8', lineHeight: 1.6 }}>
+          <div style={{ color: '#64748b', fontSize: '11px', marginBottom: '4px' }}>GOVERNANCE</div>
+          <div style={{ color: '#cbd5e1', fontSize: '11px', whiteSpace: 'pre-wrap' }}>
+            {decision.governance_validation.slice(0, 300)}
+            {decision.governance_validation.length > 300 ? '…' : ''}
+          </div>
+        </div>
+      )}
+      {validated && (
         <div style={{ marginTop: '8px', color: '#34d399', fontSize: '11px' }}>
           ✓ Governance validated
         </div>
