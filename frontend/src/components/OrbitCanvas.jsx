@@ -105,25 +105,39 @@ function makeArrow() {
   )
 }
 
-function makeKesslerFlash(pos) {
+// ── Kessler helpers ───────────────────────────────────────────────────
+
+function makeCollisionFlash(pos, color = 0xffffff) {
   const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.06, 8, 8),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 1, transparent: true }),
+    new THREE.SphereGeometry(0.05, 8, 8),
+    new THREE.MeshBasicMaterial({ color, opacity: 1, transparent: true }),
   )
   mesh.position.copy(pos)
   return mesh
 }
 
-function makeKesslerRing(pos) {
-  const pts = []
-  for (let i = 0; i <= 80; i++) {
-    const a = (i / 80) * Math.PI * 2
-    pts.push(new THREE.Vector3(Math.cos(a), Math.sin(a), 0))
+// Debris field: a cloud of particles that travels along an orbital path
+function makeDebrisField({ radius, tilt, startAngle, count, color = 0xff6600 }) {
+  const positions = new Float32Array(count * 3)
+  const angles = new Float32Array(count)
+  const radii = new Float32Array(count)
+
+  for (let i = 0; i < count; i++) {
+    // Spread debris across ~120° arc starting at collision point
+    angles[i] = startAngle + (Math.random() - 0.5) * 2.1
+    radii[i] = radius + (Math.random() - 0.5) * 0.12
+    const a = angles[i], r = radii[i]
+    positions[i * 3]     = Math.cos(a) * r
+    positions[i * 3 + 1] = Math.sin(a) * r * Math.sin(tilt)
+    positions[i * 3 + 2] = Math.sin(a) * r * Math.cos(tilt)
   }
-  const mat = new THREE.LineBasicMaterial({ color: 0xff4020, opacity: 0.7, transparent: true })
-  const ring = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat)
-  ring.position.copy(pos)
-  return ring
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  const mat = new THREE.PointsMaterial({ color, size: 0.05, transparent: true, opacity: 0.8, sizeAttenuation: true })
+  const points = new THREE.Points(geo, mat)
+
+  return { points, angles, radii, tilt, count, baseSpeed: 0.28, age: 0 }
 }
 
 // ── HUD sub-components ────────────────────────────────────────────────
@@ -347,7 +361,8 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
     simRedLine: null, simGreenArc: null, simArrows: [],
     simRingAngle: 0,
     // Kessler
-    kesslerEffects: [],
+    debrisFields: [],
+    kesslerFlashes: [],
   })
 
   const [paused, setPaused] = useState(false)
@@ -564,21 +579,31 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
         }
       }
 
-      // ── Kessler cascade effects ───────────────────────────────────
-      s.kesslerEffects = s.kesslerEffects.filter(fx => {
-        fx.age += 0.016
-        const t2 = fx.age / fx.duration
-        if (fx.type === 'flash') {
-          fx.mesh.scale.setScalar(1 + t2 * 4)
-          fx.mesh.material.opacity = Math.max(0, 1 - t2 * 2)
-        } else if (fx.type === 'ring') {
-          fx.mesh.scale.setScalar(0.1 + t2 * 3.5)
-          fx.mesh.material.opacity = Math.max(0, 0.7 - t2 * 0.7)
-        } else if (fx.type === 'debris') {
-          fx.mesh.scale.setScalar(0.05 + t2 * 2)
-          fx.mesh.material.opacity = Math.max(0, 0.4 - t2 * 0.5)
+      // ── Kessler: debris fields orbit along real paths ─────────────
+      s.debrisFields.forEach(field => {
+        field.age += 0.016
+        const pos = field.points.geometry.attributes.position.array
+        for (let i = 0; i < field.count; i++) {
+          // Each particle orbits slightly faster/slower — spreads the cloud
+          const speedVariation = 1 + (i % 7 - 3) * 0.04
+          field.angles[i] += field.baseSpeed * 0.004 * s.simSpeed * speedVariation
+          const a = field.angles[i], r = field.radii[i]
+          pos[i * 3]     = Math.cos(a) * r
+          pos[i * 3 + 1] = Math.sin(a) * r * Math.sin(field.tilt)
+          pos[i * 3 + 2] = Math.sin(a) * r * Math.cos(field.tilt)
         }
-        if (t2 >= 1) { s.scene.remove(fx.mesh); return false }
+        field.points.geometry.attributes.position.needsUpdate = true
+        // Fade out over 30 seconds
+        field.points.material.opacity = Math.max(0, 0.8 - field.age * 0.025)
+      })
+
+      // ── Kessler: collision flashes ────────────────────────────────
+      s.kesslerFlashes = s.kesslerFlashes.filter(fx => {
+        fx.age += 0.016
+        const prog = fx.age / fx.duration
+        fx.mesh.scale.setScalar(1 + prog * 5)
+        fx.mesh.material.opacity = Math.max(0, 1 - prog * 1.8)
+        if (prog >= 1) { s.scene.remove(fx.mesh); return false }
         return true
       })
 
@@ -799,62 +824,95 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
     setFocusSatId(newFocus)
   }, [simMode, satellites])
 
-  // ── Kessler visual ─────────────────────────────────────────────────
+  // ── Kessler cascade visual ─────────────────────────────────────────
   useEffect(() => {
     const s = stateRef.current
     if (!kesslerMode || !s.scene) return
 
-    // Clear existing effects
-    s.kesslerEffects.forEach(fx => s.scene.remove(fx.mesh))
-    s.kesslerEffects = []
+    // Clean up any prior Kessler effects
+    s.debrisFields.forEach(f => s.scene.remove(f.points))
+    s.kesslerFlashes.forEach(f => s.scene.remove(f.mesh))
+    s.debrisFields = []
+    s.kesslerFlashes = []
 
-    // Spawn explosions at satellite positions, staggered in time
-    const spawnExplosion = (pos, delay, isCascade = false) => {
+    // Restore orbit line colors that may have been contaminated
+    Object.entries(s.orbitLines).forEach(([, l]) => {
+      if (l?.material?.color) l.material.color.set(0x1a2535)
+    })
+
+    // ── Helper: spawn a collision flash at a real satellite position ──
+    const flash = (satId, color, delay) => {
       setTimeout(() => {
         if (!s.scene) return
-        // Flash sphere
-        const flash = makeKesslerFlash(pos.clone())
-        flash.material.color.set(isCascade ? 0xff6600 : 0xffffff)
-        s.scene.add(flash)
-        s.kesslerEffects.push({ type: 'flash', mesh: flash, age: 0, duration: 1.2 })
-
-        // Expanding ring
-        const ring = makeKesslerRing(pos.clone())
-        ring.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI)
-        s.scene.add(ring)
-        s.kesslerEffects.push({ type: 'ring', mesh: ring, age: 0, duration: 2.5 })
-
-        // Second ring offset
-        const ring2 = makeKesslerRing(pos.clone())
-        ring2.rotation.set(Math.random() * Math.PI + 0.5, Math.random() * Math.PI, 0)
-        ring2.material.color.set(0xff8800)
-        s.scene.add(ring2)
-        s.kesslerEffects.push({ type: 'debris', mesh: ring2, age: 0, duration: 3.5 })
+        const obj = s.sats[satId]
+        if (!obj) return
+        const fx = makeCollisionFlash(obj.mesh.position.clone(), color)
+        s.scene.add(fx)
+        s.kesslerFlashes.push({ mesh: fx, age: 0, duration: 1.5 })
       }, delay)
     }
 
-    // Primary collision
-    const sat1 = s.sats['SAT-001']
-    const sat2 = s.sats['SAT-002']
-    const p1 = sat1?.mesh.position ?? new THREE.Vector3(3.5, 0.5, 1)
-    const p2 = sat2?.mesh.position ?? new THREE.Vector3(3.2, 1.0, 1.2)
-    const midpoint = p1.clone().lerp(p2, 0.5)
+    // ── Helper: spawn debris that orbits along a satellite's path ─────
+    const spawnDebris = (satId, color, delay) => {
+      setTimeout(() => {
+        if (!s.scene) return
+        const obj = s.sats[satId]
+        if (!obj) return
+        const field = makeDebrisField({
+          radius: obj.orbitRadius,
+          tilt: obj.tilt,
+          startAngle: obj.angleOffset,
+          count: 90,
+          color,
+        })
+        s.scene.add(field.points)
+        s.debrisFields.push(field)
+      }, delay)
+    }
 
-    spawnExplosion(midpoint, 0)
+    // ── Helper: contaminate an orbit ring to show it's now dangerous ──
+    const contaminateOrbit = (satId, color, delay) => {
+      setTimeout(() => {
+        const line = s.orbitLines[satId]
+        if (line?.material) {
+          line.material.color.set(color)
+          line.material.opacity = 0.45
+        }
+      }, delay)
+    }
 
-    // Secondary cascade explosions at various orbital positions (simulating debris impacts)
-    const cascadePositions = [
-      new THREE.Vector3(4.0, 1.2, 0.5),
-      new THREE.Vector3(-3.5, 0.8, 1.0),
-      new THREE.Vector3(2.0, -1.5, 3.0),
-      new THREE.Vector3(-2.8, 1.8, -1.5),
-      new THREE.Vector3(3.8, -0.5, -2.0),
-      new THREE.Vector3(-1.5, 2.0, 2.5),
-    ]
+    // ════════════════════════════════════════════════════════
+    // Kessler cascade stages — based on actual scenario data:
+    // Primary: SAT-001 ↔ SAT-002 collision
+    // → debris spreads along SAT-002's orbit (550 km LEO)
+    // → debris hits DEBRIS-001 (already in a decaying orbit)
+    // → combined debris threatens ISS (SAT-003, 408 km)
+    // → cascade reaches other Starlink satellites
+    // ════════════════════════════════════════════════════════
 
-    cascadePositions.forEach((pos, i) => {
-      spawnExplosion(pos, 800 + i * 400, true)
-    })
+    // Stage 1 (t=0): Primary collision SAT-001 ↔ SAT-002
+    flash('SAT-001', 0xffffff, 0)
+    flash('SAT-002', 0xffffff, 80)
+    spawnDebris('SAT-002', 0xff6600, 200)   // orange debris cloud from Starlink
+    spawnDebris('SAT-001', 0xffaa44, 400)   // GPS debris field
+
+    // Stage 2 (t=2s): SAT-002 orbit ring shows contamination
+    contaminateOrbit('SAT-002', 0xff6600, 2000)
+
+    // Stage 3 (t=3s): Debris field reaches DEBRIS-001 (already fragile orbit)
+    // CONJ-002: SAT-001 ↔ DEBRIS-001
+    flash('DEBRIS-001', 0xff4400, 3000)
+    spawnDebris('DEBRIS-001', 0xff3300, 3200)  // red — more dangerous, larger debris
+    contaminateOrbit('DEBRIS-001', 0xff3300, 3500)
+
+    // Stage 4 (t=5s): ISS (SAT-003) threatened — CONJ-003
+    // Debris from DEBRIS-001 reaches ISS orbital altitude
+    flash('SAT-003', 0xff8800, 5000)
+    spawnDebris('SAT-003', 0xff5500, 5200)
+    contaminateOrbit('SAT-003', 0xff5500, 5500)
+
+    // Stage 5 (t=7s): SAT-001 orbit contaminated — GPS constellation at risk
+    contaminateOrbit('SAT-001', 0xffaa00, 7000)
 
   }, [kesslerMode])
 
