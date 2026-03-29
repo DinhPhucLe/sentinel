@@ -5,27 +5,37 @@ import { createEarth } from '../utils/createEarth'
 
 const EARTH_RADIUS = 2.5
 
+// Graduated altitude mapping for 50-object dataset (420–960 km LEO range)
 function altToRadius(alt) {
-  if (alt > 10000) return EARTH_RADIUS + 3.0
-  if (alt > 1000)  return EARTH_RADIUS + 1.8
-  if (alt > 350)   return EARTH_RADIUS + 0.8
-  return EARTH_RADIUS + 0.5
+  if (alt > 10000) return EARTH_RADIUS + 3.0   // MEO/GEO
+  if (alt > 1000)  return EARTH_RADIUS + 1.8   // upper LEO
+  if (alt > 850)   return EARTH_RADIUS + 1.5   // high LEO (SSO ~850-960 km)
+  if (alt > 700)   return EARTH_RADIUS + 1.2   // mid LEO (SSO ~700-850 km)
+  if (alt > 550)   return EARTH_RADIUS + 1.0   // low-mid LEO (550-700 km)
+  if (alt > 400)   return EARTH_RADIUS + 0.8   // low LEO (ISS/HST ~400-550 km)
+  return EARTH_RADIUS + 0.6                     // very low LEO
 }
 
 const SAT_COLORS = {
-  GPS: 0x00C8F0, STARLINK: 0x90B0C0, ISS: 0xD0D8E0, DEBRIS: 0x505860,
-  JAXA: 0x00B4E0, ROSCOSMOS: 0xE07040, UNKNOWN: 0x606870,
+  GPS: 0x00C8F0, STARLINK: 0x90B0C0, ISS: 0xF0D060, DEBRIS: 0x505860,
+  JAXA: 0x00B4E0, ROSCOSMOS: 0xE07040, CNSA: 0xE04040,
+  ESA: 0x4488FF, NASA: 0xFFA020, NOAA: 0x20C890,
+  US: 0x7090A0, GER: 0x80B060, CHLE: 0xC0A050, UNKNOWN: 0x606870,
 }
 const SAT_HEX = {
-  GPS: '#00C8F0', STARLINK: '#90B0C0', ISS: '#D0D8E0', DEBRIS: '#505860',
-  JAXA: '#00B4E0', ROSCOSMOS: '#E07040', UNKNOWN: '#606870',
+  GPS: '#00C8F0', STARLINK: '#90B0C0', ISS: '#F0D060', DEBRIS: '#505860',
+  JAXA: '#00B4E0', ROSCOSMOS: '#E07040', CNSA: '#E04040',
+  ESA: '#4488FF', NASA: '#FFA020', NOAA: '#20C890',
+  US: '#7090A0', GER: '#80B060', CHLE: '#C0A050', UNKNOWN: '#606870',
 }
 
+// Real-world PC thresholds matching NORAD operational standards
+// PC > 0.01% (0.0001) = mandatory review; > 0.5% = critical emergency
 const CONJ_TIERS = [
-  { key: 'CRITICAL', label: 'CRITICAL', color: '#f87171', test: p => p >= 0.7 },
-  { key: 'HIGH',     label: 'HIGH',     color: '#fb923c', test: p => p >= 0.4 && p < 0.7 },
-  { key: 'MEDIUM',   label: 'MEDIUM',   color: '#fbbf24', test: p => p >= 0.2 && p < 0.4 },
-  { key: 'LOW',      label: 'LOW',      color: '#34d399', test: p => p < 0.2 },
+  { key: 'CRITICAL', label: 'CRITICAL', color: '#f87171', test: p => p >= 0.005 },
+  { key: 'HIGH',     label: 'HIGH',     color: '#fb923c', test: p => p >= 0.001 && p < 0.005 },
+  { key: 'MEDIUM',   label: 'MEDIUM',   color: '#fbbf24', test: p => p >= 0.0003 && p < 0.001 },
+  { key: 'LOW',      label: 'LOW',      color: '#34d399', test: p => p < 0.0003 },
 ]
 const CONJ_COLOR_THREE = { CRITICAL: 0xf87171, HIGH: 0xfb923c, MEDIUM: 0xfbbf24, LOW: 0x34d399 }
 
@@ -682,12 +692,13 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
     Object.values(s.orbitLines).forEach(l => l && s.scene.remove(l))
     s.sats = {}; s.orbitLines = {}
 
-    const orbitTilts = { 'SAT-001': 0.2, 'SAT-002': 0.35, 'SAT-003': -0.15, 'DEBRIS-001': 0.5 }
-
     satellites.forEach((sat, i) => {
       const color = SAT_COLORS[sat.operator] || SAT_COLORS.UNKNOWN
       const radius = altToRadius(sat.altitude_km)
-      const tilt = orbitTilts[sat.id] ?? (i * 0.2)
+      // Use real inclination (degrees → radians) for orbital plane tilt
+      const tilt = (sat.inclination ?? 0) * Math.PI / 180
+      // Golden-angle spread gives uniform distribution for any satellite count
+      const angleOffset = (i * 2.39996) % (2 * Math.PI)
 
       const line = makeOrbitLine(radius, tilt, color)
       s.scene.add(line); s.orbitLines[sat.id] = line
@@ -711,14 +722,11 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
 
       s.sats[sat.id] = {
         mesh, orbitRadius: radius, avoidOrbitRadius: radius + 0.6,
-        speed: 0.3 / (radius / EARTH_RADIUS), tilt, angleOffset: i * (Math.PI / 2),
-        isAvoiding: sat.id === 'SAT-002', currentRadius: radius,
+        speed: 0.3 / (radius / EARTH_RADIUS), tilt, angleOffset,
+        isAvoiding: false, currentRadius: radius,
         operator: sat.operator, controllable: sat.controllable,
       }
     })
-
-    if (s.sats['SAT-001']) s.sats['SAT-001'].angleOffset = 0
-    if (s.sats['SAT-002']) s.sats['SAT-002'].angleOffset = 0.1
 
     setLayers(prev => {
       const sats = { ...prev.sats }

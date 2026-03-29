@@ -73,6 +73,48 @@ def get_conjunction_events() -> list[ConjunctionEvent]:
     return events
 
 
+# ── Vector helpers for orbital propagation ──────────────────────────────────
+
+def _cross(a: tuple, b: tuple) -> tuple:
+    return (
+        a[1]*b[2] - a[2]*b[1],
+        a[2]*b[0] - a[0]*b[2],
+        a[0]*b[1] - a[1]*b[0],
+    )
+
+
+def _normalize(v: tuple) -> tuple:
+    mag = math.sqrt(sum(x**2 for x in v))
+    return tuple(x / mag for x in v) if mag > 0 else v
+
+
+def _propagate_orbit(position: tuple, velocity: tuple, hours: float) -> tuple:
+    """
+    Advance a satellite along its circular orbit by `hours` hours.
+    Uses Rodrigues' rotation formula around the orbital-plane normal.
+    GM = 398 600 km³/s².  No linear extrapolation — stays on the orbit shell.
+    """
+    GM = 398_600.0
+    r = math.sqrt(sum(x**2 for x in position))
+    if r == 0:
+        return position
+
+    T_s = 2 * math.pi * math.sqrt(r**3 / GM)   # orbital period, seconds
+    theta = (2 * math.pi * hours * 3600.0 / T_s) % (2 * math.pi)
+
+    n = _normalize(_cross(position, velocity))   # orbital-plane normal
+    cos_t = math.cos(theta)
+    sin_t = math.sin(theta)
+    k_x_p = _cross(n, position)
+    k_dot_p = sum(a * b for a, b in zip(n, position))
+
+    return (
+        round(position[0] * cos_t + k_x_p[0] * sin_t + n[0] * k_dot_p * (1 - cos_t), 2),
+        round(position[1] * cos_t + k_x_p[1] * sin_t + n[1] * k_dot_p * (1 - cos_t), 2),
+        round(position[2] * cos_t + k_x_p[2] * sin_t + n[2] * k_dot_p * (1 - cos_t), 2),
+    )
+
+
 def compute_collision_probability(sat_a: Satellite, sat_b: Satellite) -> float:
     """
     Distance-based collision probability estimate.
@@ -117,8 +159,11 @@ def simulate_maneuver(sat_id: str, delta_v: float) -> dict:
             "new_position": list(sat.position),
             "new_miss_distance_km": 999.0,
             "fuel_consumed": round(delta_v * 0.001, 4),
+            "secondary_conflicts": [],
+            "all_clear": True,
         }
 
+    partner_id = conjunction["sat_b_id"] if conjunction["sat_a_id"] == sat_id else conjunction["sat_a_id"]
     base_miss_km = conjunction["miss_distance_km"]
     tca_hours = conjunction["time_to_closest_approach_hours"]
 
@@ -143,12 +188,35 @@ def simulate_maneuver(sat_id: str, delta_v: float) -> dict:
         round(sat.position[2] + nudge_km * (vx / speed), 2),
     )
 
+    # ── Secondary conflict check ─────────────────────────────────────────────
+    # Propagate the maneuvering satellite and every non-involved satellite to
+    # TCA using Rodrigues rotation and check proximity at that moment.
+    sat_pos_at_tca = _propagate_orbit(new_pos, tuple(sat.velocity), tca_hours)
+    secondary_conflicts = []
+    for other_id, other_sat in satellites.items():
+        if other_id == sat_id or other_id == partner_id:
+            continue
+        other_pos_at_tca = _propagate_orbit(
+            tuple(other_sat.position), tuple(other_sat.velocity), tca_hours
+        )
+        dist = round(_distance(sat_pos_at_tca, other_pos_at_tca), 2)
+        if dist < 20.0:   # 20 km secondary safety margin
+            secondary_conflicts.append({
+                "sat_id": other_id,
+                "sat_name": other_sat.name,
+                "operator": other_sat.operator,
+                "miss_distance_km": dist,
+                "controllable": other_sat.controllable,
+            })
+
     return {
         "sat_id": sat_id,
         "delta_v_applied": delta_v,
         "new_position": list(new_pos),
         "new_miss_distance_km": new_miss_km,
         "fuel_consumed": fuel_consumed,
+        "secondary_conflicts": secondary_conflicts,
+        "all_clear": len(secondary_conflicts) == 0,
     }
 
 
