@@ -17,7 +17,7 @@ export default function App() {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: '60% 40%',
+      gridTemplateColumns: '3fr 2fr',
       gridTemplateRows: 'auto 1fr',
       gap: '8px',
       padding: '8px',
