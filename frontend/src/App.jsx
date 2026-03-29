@@ -117,10 +117,85 @@ function Header({ connected, status, clock }) {
 
 // ═══ Mission View (our working layout) ═══════════════════════════════
 
+// ── Expand button for panels ─────────────────────────────────────────
+function ExpandBtn({ expanded, onClick }) {
+  return (
+    <button onClick={onClick} title={expanded ? 'Collapse' : 'Expand'} style={{
+      background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
+      color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center',
+      transition: 'color 0.2s',
+    }}
+      onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {expanded
+          ? <><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></>
+          : <><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></>
+        }
+      </svg>
+    </button>
+  )
+}
+
+// ── Overlay panel (fullscreen expand) ────────────────────────────────
+function ExpandedOverlay({ children, onClose, title }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 999,
+      background: 'rgba(0,0,0,0.75)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      animation: 'fadeInUp 0.25s var(--ease-out)',
+    }} onClick={onClose}>
+      <div style={{
+        width: '85vw', height: '80vh',
+        display: 'flex', flexDirection: 'column',
+        background: 'var(--bg-elevated)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-md)',
+        overflow: 'hidden',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.5)',
+      }} onClick={e => e.stopPropagation()}>
+        {/* Header bar */}
+        <div style={{
+          padding: '10px 16px', flexShrink: 0,
+          display: 'flex', alignItems: 'center',
+          borderBottom: '1px solid var(--border-subtle)',
+          background: 'var(--bg-surface)',
+        }}>
+          <span style={{
+            fontSize: '10px', fontWeight: '600', letterSpacing: '0.12em',
+            color: 'var(--text-secondary)', fontFamily: 'var(--font-display)',
+          }}>{title}</span>
+          <div style={{ flex: 1 }} />
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--text-tertiary)', padding: '4px',
+            transition: 'color 0.2s',
+          }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-tertiary)'}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        {/* Content */}
+        <div style={{ flex: 1, minHeight: 0 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function MissionView({ sim }) {
   const [selectedEvent, setSelectedEvent] = useState(null)
-  const [simMode, setSimMode] = useState(null)       // { satAId, satBId } | null
+  const [simMode, setSimMode] = useState(null)
   const [maneuverQueue, setManeuverQueue] = useState([])
+  const [expandedPanel, setExpandedPanel] = useState(null) // 'agent' | 'mission' | 'queue' | null
 
   const handleSelect = (ev) => setSelectedEvent(prev => prev?.id === ev.id ? null : ev)
 
@@ -172,25 +247,68 @@ function MissionView({ sim }) {
         </div>
         {/* Bottom row: Agent Log + Maneuver Queue 50/50 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)', minHeight: 0 }}>
-          <AgentLog messages={sim.agentMessages} />
-          <ManeuverQueue queue={maneuverQueue} />
+          <div style={{ position: 'relative', minHeight: 0 }}>
+            <div style={{ position: 'absolute', top: '6px', right: '24px', zIndex: 2 }}>
+              <ExpandBtn expanded={false} onClick={() => setExpandedPanel('agent')} />
+            </div>
+            <AgentLog messages={sim.agentMessages} />
+          </div>
+          <div style={{ position: 'relative', minHeight: 0 }}>
+            <div style={{ position: 'absolute', top: '6px', right: '24px', zIndex: 2 }}>
+              <ExpandBtn expanded={false} onClick={() => setExpandedPanel('queue')} />
+            </div>
+            <ManeuverQueue queue={maneuverQueue} />
+          </div>
         </div>
       </div>
 
       {/* Right — triage table + mission panel */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', minHeight: 0, overflow: 'hidden' }}>
         <TriageTable events={sim.events} selectedId={selectedEvent?.id} onSelect={handleSelect} />
-        <MissionPanel
-          status={sim.status}
-          selectedEvent={selectedEvent}
-          decision={sim.decision}
-          isRunning={sim.isRunning}
-          connected={sim.connected}
-          onSimulate={handleSimulate}
-          onPushManeuver={handlePushManeuver}
-          onReset={handleReset}
-        />
+        <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 2 }}>
+            <ExpandBtn expanded={false} onClick={() => setExpandedPanel('mission')} />
+          </div>
+          <MissionPanel
+            status={sim.status}
+            selectedEvent={selectedEvent}
+            decision={sim.decision}
+            isRunning={sim.isRunning}
+            connected={sim.connected}
+            onSimulate={handleSimulate}
+            onPushManeuver={handlePushManeuver}
+            onReset={handleReset}
+          />
+        </div>
       </div>
+
+      {/* ── Expanded overlays ── */}
+      {expandedPanel === 'agent' && (
+        <ExpandedOverlay title="AGENT LOG" onClose={() => setExpandedPanel(null)}>
+          <AgentLog messages={sim.agentMessages} />
+        </ExpandedOverlay>
+      )}
+      {expandedPanel === 'mission' && (
+        <ExpandedOverlay title="MISSION CONTROL" onClose={() => setExpandedPanel(null)}>
+          <div style={{ height: '100%', overflow: 'auto', padding: 'var(--space-md)' }}>
+            <MissionPanel
+              status={sim.status}
+              selectedEvent={selectedEvent}
+              decision={sim.decision}
+              isRunning={sim.isRunning}
+              connected={sim.connected}
+              onSimulate={handleSimulate}
+              onPushManeuver={handlePushManeuver}
+              onReset={handleReset}
+            />
+          </div>
+        </ExpandedOverlay>
+      )}
+      {expandedPanel === 'queue' && (
+        <ExpandedOverlay title="MANEUVER QUEUE" onClose={() => setExpandedPanel(null)}>
+          <ManeuverQueue queue={maneuverQueue} />
+        </ExpandedOverlay>
+      )}
     </div>
   )
 }

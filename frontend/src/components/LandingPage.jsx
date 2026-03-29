@@ -153,7 +153,7 @@ export default function LandingPage({ onEnter }) {
 
           <div style={{
             position: 'relative',
-            margin: '-80px 0 -40px -350px',
+            margin: '-80px 0 -40px -10px',
             display: 'inline-block',
           }}>
             {/* Glow bloom behind logo */}
