@@ -362,7 +362,7 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
     el.appendChild(s.renderer.domElement)
 
     s.scene = new THREE.Scene()
-    s.camera = new THREE.PerspectiveCamera(50, el.clientWidth / el.clientHeight, 0.1, 100)
+    s.camera = new THREE.PerspectiveCamera(50, el.clientWidth / el.clientHeight, 0.1, 2000)
     s.camera.position.set(0, 5, 10)
 
     s.controls = new OrbitControls(s.camera, s.renderer.domElement)
@@ -379,18 +379,119 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
     s.controls.addEventListener('start', () => { s.dragDist = 0 })
     s.controls.addEventListener('change', () => { s.dragDist++ })
 
-    // Stars
-    const makeStars = (count, spread, size, opacity, color) => {
+    // ── Deep-space background sphere ──
+    const bgGeo = new THREE.SphereGeometry(900, 64, 64)
+    const bgCanvas = document.createElement('canvas')
+    bgCanvas.width = 2048; bgCanvas.height = 1024
+    const bgCtx = bgCanvas.getContext('2d')
+    // Base dark space
+    bgCtx.fillStyle = '#030610'
+    bgCtx.fillRect(0, 0, 2048, 1024)
+    // Soft nebula / galaxy clouds — very subtle
+    const nebulaSpots = [
+      { x: 500, y: 350, r: 320, color: 'rgba(15,25,60,0.18)' },
+      { x: 1400, y: 500, r: 400, color: 'rgba(30,15,45,0.12)' },
+      { x: 1800, y: 200, r: 220, color: 'rgba(12,30,50,0.10)' },
+      { x: 300, y: 750, r: 260, color: 'rgba(20,12,40,0.08)' },
+      { x: 1000, y: 150, r: 300, color: 'rgba(10,20,45,0.10)' },
+    ]
+    nebulaSpots.forEach(n => {
+      const ng = bgCtx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r)
+      ng.addColorStop(0, n.color)
+      ng.addColorStop(0.6, n.color.replace(/[\d.]+\)$/, '0.03)'))
+      ng.addColorStop(1, 'transparent')
+      bgCtx.fillStyle = ng
+      bgCtx.fillRect(0, 0, 2048, 1024)
+    })
+    // Milky-way band — very faint diagonal glow
+    bgCtx.save()
+    bgCtx.translate(1024, 512)
+    bgCtx.rotate(-0.25)
+    const mwGrad = bgCtx.createLinearGradient(0, -80, 0, 80)
+    mwGrad.addColorStop(0, 'transparent')
+    mwGrad.addColorStop(0.3, 'rgba(200,210,230,0.02)')
+    mwGrad.addColorStop(0.5, 'rgba(220,225,240,0.04)')
+    mwGrad.addColorStop(0.7, 'rgba(200,210,230,0.02)')
+    mwGrad.addColorStop(1, 'transparent')
+    bgCtx.fillStyle = mwGrad
+    bgCtx.fillRect(-1200, -80, 2400, 160)
+    bgCtx.restore()
+    // Baked stars — white/cream only, small and subtle
+    for (let i = 0; i < 3000; i++) {
+      const sx = Math.random() * 2048, sy = Math.random() * 1024
+      const brightness = Math.random()
+      const sr = brightness > 0.97 ? 1.2 : brightness > 0.85 ? 0.7 : 0.4
+      const alpha = 0.2 + brightness * 0.5
+      // White to warm cream only
+      const warm = Math.random()
+      const starColor = warm < 0.7
+        ? `rgba(240,242,255,${alpha})`
+        : `rgba(255,248,235,${alpha})`
+      bgCtx.beginPath()
+      bgCtx.arc(sx, sy, sr, 0, Math.PI * 2)
+      bgCtx.fillStyle = starColor
+      bgCtx.fill()
+    }
+    const bgTex = new THREE.CanvasTexture(bgCanvas)
+    bgTex.colorSpace = THREE.SRGBColorSpace
+    const bgMat = new THREE.MeshBasicMaterial({ map: bgTex, side: THREE.BackSide })
+    const bgMesh = new THREE.Mesh(bgGeo, bgMat)
+    s.scene.add(bgMesh)
+    s.bgMesh = bgMesh
+
+    // ── 3D star particles — white/cream, gentle twinkle ──
+    const starVertShader = `
+      attribute float aSize;
+      attribute float aPhase;
+      varying float vPhase;
+      uniform float uTime;
+      void main() {
+        vPhase = aPhase;
+        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = aSize * (120.0 / -mvPos.z);
+        gl_Position = projectionMatrix * mvPos;
+      }
+    `
+    const starFragShader = `
+      varying float vPhase;
+      uniform float uTime;
+      uniform vec3 uColor;
+      void main() {
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        if (d > 1.0) discard;
+        float glow = exp(-d * 3.5);
+        float twinkle = 0.8 + 0.2 * sin(uTime * 1.2 + vPhase * 6.2831);
+        gl_FragColor = vec4(uColor, glow * twinkle * 0.6);
+      }
+    `
+    const makeStarLayer = (count, spread, baseSize, color) => {
       const pos = new Float32Array(count * 3)
-      for (let i = 0; i < count; i++) { pos[i*3]=(Math.random()-0.5)*spread; pos[i*3+1]=(Math.random()-0.5)*spread; pos[i*3+2]=(Math.random()-0.5)*spread }
+      const sizes = new Float32Array(count)
+      const phases = new Float32Array(count)
+      for (let i = 0; i < count; i++) {
+        pos[i*3]   = (Math.random() - 0.5) * spread
+        pos[i*3+1] = (Math.random() - 0.5) * spread
+        pos[i*3+2] = (Math.random() - 0.5) * spread
+        sizes[i] = baseSize * (0.4 + Math.random() * 1.0)
+        phases[i] = Math.random()
+      }
       const geo = new THREE.BufferGeometry()
       geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-      const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color, size, transparent: true, opacity, sizeAttenuation: true }))
+      geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1))
+      geo.setAttribute('aPhase', new THREE.Float32BufferAttribute(phases, 1))
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: starVertShader, fragmentShader: starFragShader,
+        uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(color) } },
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      })
+      const pts = new THREE.Points(geo, mat)
       s.scene.add(pts)
       return pts
     }
-    s.stars = makeStars(3000, 100, 0.06, 0.85, 0xffffff)
-    makeStars(1500, 160, 0.03, 0.4, 0xaabbcc)
+    // Small white stars
+    s.stars = makeStarLayer(3000, 500, 1.0, 0xeeeeff)
+    // Dim cream dust
+    s.starsWarm = makeStarLayer(2000, 600, 0.6, 0xfff8e8)
 
     const earth = createEarth({ radius: EARTH_RADIUS, segments: 64 })
     s.scene.add(earth.group)
@@ -412,7 +513,15 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
       const delta = s.clock.getDelta ? 0.016 : 0.016
 
       if (s.earthUpdate) s.earthUpdate(t)
-      if (s.stars) { s.stars.rotation.y = t * 0.003; s.stars.rotation.x = t * 0.001 }
+      // Rotate background sphere slowly
+      if (s.bgMesh) { s.bgMesh.rotation.y = t * 0.001 }
+      // Update star shader time + gentle rotation
+      ;[s.stars, s.starsWarm].forEach((layer, i) => {
+        if (!layer) return
+        layer.material.uniforms.uTime.value = t
+        layer.rotation.y = t * (0.002 + i * 0.0005)
+        layer.rotation.x = t * (0.001 + i * 0.0003)
+      })
 
       // ── Satellite orbit animation ─────────────────────────────────
       const inSim = s.simPhase !== null
@@ -888,6 +997,50 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
         <button style={hudBtnStyle(activePanel === 'layers')} onClick={() => setActivePanel(p => p === 'layers' ? null : 'layers')}>☰ LAYERS</button>
         <button style={hudBtnStyle(activePanel === 'settings')} onClick={() => setActivePanel(p => p === 'settings' ? null : 'settings')}>⚙ SETTINGS</button>
         <button style={hudBtnStyle(paused)} onClick={() => setPaused(p => !p)}>{paused ? '▶ RESUME' : '⏸ PAUSE'}</button>
+      </div>
+
+      {/* Zoom + Home controls — bottom right */}
+      <div style={{
+        position: 'absolute', bottom: simMode ? 60 : 16, right: 10,
+        display: 'flex', flexDirection: 'column', gap: '3px',
+      }}>
+        <button
+          style={{ ...hudBtnStyle(false), padding: '4px 8px', fontSize: '12px', lineHeight: 1, fontWeight: '700', width: '30px', textAlign: 'center' }}
+          onClick={() => {
+            const s = stateRef.current
+            if (!s.controls || !s.camera) return
+            const dir = new THREE.Vector3().subVectors(s.camera.position, s.controls.target).normalize()
+            const dist = s.camera.position.distanceTo(s.controls.target)
+            const newDist = Math.max(s.controls.minDistance, dist * 0.8)
+            s.camera.position.copy(s.controls.target).addScaledVector(dir, newDist)
+            s.controls.update()
+          }}
+          title="Zoom In"
+        >+</button>
+        <button
+          style={{ ...hudBtnStyle(false), padding: '4px 8px', fontSize: '12px', lineHeight: 1, fontWeight: '700', width: '30px', textAlign: 'center' }}
+          onClick={() => {
+            const s = stateRef.current
+            if (!s.controls || !s.camera) return
+            const dir = new THREE.Vector3().subVectors(s.camera.position, s.controls.target).normalize()
+            const dist = s.camera.position.distanceTo(s.controls.target)
+            const newDist = Math.min(s.controls.maxDistance, dist * 1.25)
+            s.camera.position.copy(s.controls.target).addScaledVector(dir, newDist)
+            s.controls.update()
+          }}
+          title="Zoom Out"
+        >−</button>
+        <button
+          style={{ ...hudBtnStyle(false), padding: '4px 8px', fontSize: '9px', lineHeight: 1, fontWeight: '600', width: '30px', textAlign: 'center', letterSpacing: '0.04em' }}
+          onClick={() => {
+            const s = stateRef.current
+            if (!s.controls || !s.camera) return
+            s.camera.position.set(0, 5, 10)
+            s.controls.target.set(0, 0, 0)
+            s.controls.update()
+          }}
+          title="Reset View"
+        >⌂</button>
       </div>
 
       {/* Panels */}
