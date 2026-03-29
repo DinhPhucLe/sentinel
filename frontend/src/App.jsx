@@ -406,19 +406,14 @@ function Dashboard({ onBack }) {
 // ═══ App ═════════════════════════════════════════════════════════════
 
 export default function App() {
-  const [page, setPage] = useState('landing')
-  const [showTransition, setShowTransition] = useState(false)
+  const [page, setPage] = useState('landing') // landing | transition | dashboard
 
-  if (page === 'landing') return <LandingPage onEnter={() => { setPage('dashboard'); setShowTransition(true) }} />
-  return (
+  if (page === 'landing') return <LandingPage onEnter={() => setPage('transition')} />
+  if (page === 'transition') return (
     <>
-      <Dashboard onBack={() => setPage('landing')} />
-      {showTransition && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: '#030610' }} />
-          <LaunchTransition onComplete={() => setShowTransition(false)} />
-        </>
-      )}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: '#030610' }} />
+      <LaunchTransition onComplete={() => setPage('dashboard')} />
     </>
   )
+  return <Dashboard onBack={() => setPage('landing')} />
 }
