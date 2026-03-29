@@ -1,3 +1,29 @@
+import { useState, useEffect, useRef } from 'react'
+
+// ── Typewriter hook ──────────────────────────────────────────────────
+function useTypewriter(text, speed = 8, enabled = true) {
+  const [displayed, setDisplayed] = useState('')
+  const [done, setDone] = useState(false)
+  const prevText = useRef('')
+
+  useEffect(() => {
+    if (!enabled || !text) { if (!enabled) return; setDisplayed(''); setDone(true); return }
+    if (text === prevText.current) { setDisplayed(text); setDone(true); return }
+    prevText.current = text
+    let i = 0
+    setDisplayed('')
+    setDone(false)
+    const id = setInterval(() => {
+      i += 1 + Math.floor(Math.random() * 2)
+      if (i >= text.length) { setDisplayed(text); setDone(true); clearInterval(id) }
+      else setDisplayed(text.slice(0, i))
+    }, speed)
+    return () => clearInterval(id)
+  }, [text, speed, enabled])
+
+  return [displayed, done]
+}
+
 const STATUS_CONFIG = {
   MONITORING:  { label: 'MONITORING',        color: '#38bdf8', bg: '#0d2d4a', pulse: false },
   ANALYZING:   { label: 'ANALYZING',         color: '#fb923c', bg: '#2d1a0d', pulse: true  },
@@ -55,11 +81,15 @@ function DecisionCard({ decision }) {
   const color = validated ? '#34d399' : '#f87171'
   const bg = validated ? '#0a1f12' : '#1f0a0a'
 
-  const negLines = formatDecisionText(decision.negotiation_decision)
-  const govLines = formatDecisionText(decision.governance_validation)
+  const [negTyped, negDone] = useTypewriter(decision.negotiation_decision || '', 5)
+  const [govTyped, govDone] = useTypewriter(decision.governance_validation || '', 5, negDone)
+
+  const negLines = formatDecisionText(negTyped)
+  const govLines = formatDecisionText(govTyped)
+  const cursor = <span style={{ display: 'inline-block', width: '5px', height: '12px', background: color, marginLeft: '2px', animation: 'cursorBlink 0.8s step-end infinite', verticalAlign: 'text-bottom', opacity: 0.8 }} />
 
   return (
-    <div style={{ borderRadius: '6px', overflow: 'hidden', border: `1px solid ${color}22` }}>
+    <div style={{ borderRadius: '6px', overflow: 'hidden', border: `1px solid ${color}22`, animation: 'slideIn 0.3s var(--ease-out)' }}>
       {/* Status header */}
       <div style={{
         padding: '8px 12px', background: `${color}12`,
@@ -87,16 +117,17 @@ function DecisionCard({ decision }) {
               Negotiation Decision
             </div>
             <DecisionLines lines={negLines} />
+            {!negDone && cursor}
           </div>
         )}
 
-        {/* Divider */}
-        {negLines.length > 0 && govLines.length > 0 && (
+        {/* Divider — only show once negotiation is done typing */}
+        {negDone && negLines.length > 0 && govLines.length > 0 && (
           <div style={{ height: '1px', background: '#1e3a5f', margin: '0 0 10px' }} />
         )}
 
-        {/* Governance section */}
-        {govLines.length > 0 && (
+        {/* Governance section — starts typing after negotiation finishes */}
+        {negDone && govLines.length > 0 && (
           <div>
             <div style={{
               fontSize: '9px', fontWeight: '600', color: '#64748b',
@@ -106,9 +137,14 @@ function DecisionCard({ decision }) {
               Safety Validation
             </div>
             <DecisionLines lines={govLines} />
+            {!govDone && cursor}
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes cursorBlink { 0%,100%{opacity:1} 50%{opacity:0} }
+      `}</style>
     </div>
   )
 }
