@@ -337,6 +337,110 @@ body {
 }
 
 
+/* ── SENTINEL Logo ────────────────────────────────────── */
+.sentinel-logo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #d0d8e8 25%,
+    #ffffff 50%,
+    #8ab4c8 75%,
+    #ffffff 100%
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: logoShimmer 6s ease-in-out infinite;
+  position: relative;
+  display: inline-block;
+}
+
+.sentinel-logo::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(94, 170, 187, 0.4) 30%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(94, 170, 187, 0.4) 70%,
+    transparent 100%
+  );
+  animation: logoLineShimmer 4s ease-in-out infinite;
+}
+
+@keyframes logoShimmer {
+  0%   { background-position: 100% 50%; }
+  50%  { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+@keyframes logoLineShimmer {
+  0%, 100% { opacity: 0.3; transform: scaleX(0.6); }
+  50%      { opacity: 1; transform: scaleX(1); }
+}
+
+/* Sidebar logo mark */
+.sentinel-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 15px;
+  font-family: 'Space Grotesk', sans-serif;
+  color: #fff;
+  background: linear-gradient(135deg, #2a3a5a 0%, #1a2a44 50%, #2a4a6a 100%);
+  border: 1px solid rgba(94, 170, 187, 0.2);
+  box-shadow:
+    0 0 12px rgba(94, 170, 187, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.sentinel-mark:hover {
+  border-color: rgba(94, 170, 187, 0.4);
+  box-shadow:
+    0 0 20px rgba(94, 170, 187, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transform: scale(1.05);
+}
+
+.sentinel-mark::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(94, 170, 187, 0.08) 60deg,
+    transparent 120deg
+  );
+  animation: markRotate 8s linear infinite;
+}
+
+@keyframes markRotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+
 /* ── Grid Background ──────────────────────────────────── */
 .grid-bg { position: relative; }
 .grid-bg::before {

@@ -146,13 +146,9 @@ function Dashboard({ onBack }) {
         </button>
 
         <div>
-          <div style={{
-            fontSize: '15px', fontWeight: '700', fontFamily: 'var(--font-display)',
-            color: 'var(--text-heading)', letterSpacing: '0.1em',
-            animation: 'textGlow 6s ease-in-out infinite',
-          }}>
+          <span className="sentinel-logo" style={{ fontSize: '16px' }}>
             SENTINEL
-          </div>
+          </span>
           <div style={{
             fontSize: '9px', color: 'var(--text-tertiary)',
             letterSpacing: '0.06em', fontFamily: 'var(--font-display)', marginTop: '1px',
