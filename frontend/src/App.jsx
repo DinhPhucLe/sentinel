@@ -7,6 +7,7 @@ import LandingPage from './components/LandingPage'
 import { SentinelMark } from './components/SentinelLogo'
 import TriageTable from './components/TriageTable'
 import MissionPanel from './components/MissionPanel'
+import ChatBot from './components/ChatBot'
 
 // ═══ Sidebar ═════════════════════════════════════════════════════════
 
@@ -228,6 +229,12 @@ function Dashboard({ onBack }) {
   const [view, setView] = useState('dashboard')
   const clock = useLiveClock()
 
+  const handleChatAction = (action) => {
+    if (action.type === 'SET_VIEW' && action.payload?.view) {
+      setView(action.payload.view)
+    }
+  }
+
   return (
     <div style={{ display: 'flex', height: '100vh', background: 'var(--bg-deep)', overflow: 'hidden' }}>
       <Sidebar active={view} onNav={setView} onBack={onBack} />
@@ -245,6 +252,13 @@ function Dashboard({ onBack }) {
           {view === 'alerts'      && <AlertsView />}
         </main>
       </div>
+      <ChatBot
+        satellites={sim.satellites}
+        events={sim.events}
+        status={sim.status}
+        view={view}
+        onAction={handleChatAction}
+      />
     </div>
   )
 }
