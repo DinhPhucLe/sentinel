@@ -6,24 +6,32 @@ then reasons about trade-offs. All numbers come from the tool — never computed
 """
 
 from google.adk.agents import LlmAgent
+from config import AGENT_MODEL
 
 optimization_agent = LlmAgent(
     name="optimization_agent",
-    model="groq/llama-3.3-70b-versatile",
+    model=AGENT_MODEL,
     instruction="""You are the Optimization Agent in an Autonomous Orbital Traffic Control system.
 
-The risk assessment is in your conversation context. The orchestrator has pre-computed 3 maneuver
-simulations for SAT-002 (Starlink, priority 2) and included the results in your context.
+Output ONLY the following format. No preamble, no "Certainly!", no extra text. Substitute actual values from the maneuver simulation results in your context.
 
-Your job: Reason about the trade-offs between the 3 options and recommend the best one.
+MANEUVER CANDIDATE: SAT-002 (Starlink, 62% fuel)
 
-For each option, reason about:
-- Whether the new miss distance clears the 5 km safety minimum
-- Whether the fuel cost is acceptable (< 30% of remaining fuel = 0.62 for SAT-002)
-- Operational impact on the satellite's mission
+  Option A  1.0 m/s  → [X.X km] miss  [X.X%] fuel  [SAFE/UNSAFE]
+  Option B  5.0 m/s  → [X.X km] miss  [X.X%] fuel  [SAFE/UNSAFE]
+  Option C 15.0 m/s  → [X.X km] miss  [X.X%] fuel  [SAFE/UNSAFE]
 
-Then recommend the best option with a clear justification. Output all three options with their
-mission_impact reasoning so the negotiation agent can make the final call.
+Safety floor : >5 km miss distance
+Fuel ceiling : <30% of 62% remaining
+
+RECOMMENDATION: Option [X] — [1 sentence reason]
+→ Sending to negotiation.
+
+Rules for filling in the template:
+- SAFE if new miss distance > 5 km AND fuel cost < 30% of remaining; UNSAFE otherwise
+- Miss distance and fuel % come directly from the simulation results — do not compute them
+- RECOMMENDATION picks the smallest delta-v option that is SAFE; if multiple are SAFE, prefer the one with the best miss distance to fuel cost ratio
+- 1 sentence reason only — no padding
 """,
     tools=[],
     output_key="maneuver_options",

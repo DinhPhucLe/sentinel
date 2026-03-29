@@ -1,3 +1,29 @@
+import { useState, useEffect, useRef } from 'react'
+
+// ── Typewriter hook ──────────────────────────────────────────────────
+function useTypewriter(text, speed = 8, enabled = true) {
+  const [displayed, setDisplayed] = useState('')
+  const [done, setDone] = useState(false)
+  const prevText = useRef('')
+
+  useEffect(() => {
+    if (!enabled || !text) { if (!enabled) return; setDisplayed(''); setDone(true); return }
+    if (text === prevText.current) { setDisplayed(text); setDone(true); return }
+    prevText.current = text
+    let i = 0
+    setDisplayed('')
+    setDone(false)
+    const id = setInterval(() => {
+      i += 1 + Math.floor(Math.random() * 2)
+      if (i >= text.length) { setDisplayed(text); setDone(true); clearInterval(id) }
+      else setDisplayed(text.slice(0, i))
+    }, speed)
+    return () => clearInterval(id)
+  }, [text, speed, enabled])
+
+  return [displayed, done]
+}
+
 const STATUS_CONFIG = {
   MONITORING:  { label: 'MONITORING',        color: '#38bdf8', bg: '#0d2d4a', pulse: false },
   ANALYZING:   { label: 'ANALYZING',         color: '#fb923c', bg: '#2d1a0d', pulse: true  },
@@ -34,40 +60,155 @@ function ProbabilityRing({ probability }) {
   )
 }
 
+function formatDecisionText(raw) {
+  if (!raw) return []
+  return raw.split('\n').filter(l => l.trim()).map(line => {
+    const trimmed = line.trim()
+    // Key: Value lines
+    const kv = trimmed.match(/^([A-Z][A-Za-z\s/()]+?)\s*:\s*(.+)$/)
+    if (kv) return { type: 'kv', key: kv[1], value: kv[2] }
+    // Bullet lines
+    if (/^[-•✓✗]/.test(trimmed)) return { type: 'bullet', text: trimmed.replace(/^[-•]\s*/, '') }
+    // Section headers
+    if (/^[A-Z][A-Z\s\-_]{3,}$/.test(trimmed)) return { type: 'header', text: trimmed }
+    return { type: 'text', text: trimmed }
+  })
+}
+
 function DecisionCard({ decision }) {
   if (!decision) return null
   const validated = decision.validated
   const color = validated ? '#34d399' : '#f87171'
-  const border = validated ? '#34d39933' : '#f8717133'
   const bg = validated ? '#0a1f12' : '#1f0a0a'
+
+  const [negTyped, negDone] = useTypewriter(decision.negotiation_decision || '', 5)
+  const [govTyped, govDone] = useTypewriter(decision.governance_validation || '', 5, negDone)
+
+  const negLines = formatDecisionText(negTyped)
+  const govLines = formatDecisionText(govTyped)
+  const cursor = <span style={{ display: 'inline-block', width: '5px', height: '12px', background: color, marginLeft: '2px', animation: 'cursorBlink 0.8s step-end infinite', verticalAlign: 'text-bottom', opacity: 0.8 }} />
+
   return (
-    <div style={{ padding: '10px', background: bg, border: `1px solid ${border}`, borderRadius: '5px', fontSize: '11px' }}>
-      <div style={{ color, fontWeight: 'bold', marginBottom: '6px', letterSpacing: '0.08em' }}>
-        {validated ? '✓ MANEUVER APPROVED' : '✗ MANEUVER REJECTED'}
+    <div style={{ borderRadius: '6px', overflow: 'hidden', border: `1px solid ${color}22`, animation: 'slideIn 0.3s var(--ease-out)' }}>
+      {/* Status header */}
+      <div style={{
+        padding: '8px 12px', background: `${color}12`,
+        display: 'flex', alignItems: 'center', gap: '8px',
+        borderBottom: `1px solid ${color}18`,
+      }}>
+        <span style={{ fontSize: '13px' }}>{validated ? '✓' : '✗'}</span>
+        <span style={{
+          fontSize: '10px', fontWeight: '700', color,
+          letterSpacing: '0.1em', fontFamily: 'var(--font-display)',
+        }}>
+          {validated ? 'MANEUVER APPROVED' : 'MANEUVER REJECTED'}
+        </span>
       </div>
-      {decision.negotiation_decision && (
-        <div style={{ marginBottom: '6px' }}>
-          <div style={{ color: '#475569', fontSize: '10px', marginBottom: '2px' }}>NEGOTIATION</div>
-          <div style={{ color: '#94a3b8', lineHeight: 1.5 }}>
-            {decision.negotiation_decision.slice(0, 280)}{decision.negotiation_decision.length > 280 ? '…' : ''}
+
+      <div style={{ padding: '10px 12px', background: bg }}>
+        {/* Negotiation section */}
+        {negLines.length > 0 && (
+          <div style={{ marginBottom: govLines.length ? '10px' : 0 }}>
+            <div style={{
+              fontSize: '9px', fontWeight: '600', color: '#64748b',
+              letterSpacing: '0.12em', fontFamily: 'var(--font-display)',
+              marginBottom: '6px', textTransform: 'uppercase',
+            }}>
+              Negotiation Decision
+            </div>
+            <DecisionLines lines={negLines} />
+            {!negDone && cursor}
           </div>
-        </div>
-      )}
-      {decision.governance_validation && (
-        <div>
-          <div style={{ color: '#475569', fontSize: '10px', marginBottom: '2px' }}>GOVERNANCE</div>
-          <div style={{ color: '#94a3b8', lineHeight: 1.5 }}>
-            {decision.governance_validation.slice(0, 200)}{decision.governance_validation.length > 200 ? '…' : ''}
+        )}
+
+        {/* Divider — only show once negotiation is done typing */}
+        {negDone && negLines.length > 0 && govLines.length > 0 && (
+          <div style={{ height: '1px', background: '#1e3a5f', margin: '0 0 10px' }} />
+        )}
+
+        {/* Governance section — starts typing after negotiation finishes */}
+        {negDone && govLines.length > 0 && (
+          <div>
+            <div style={{
+              fontSize: '9px', fontWeight: '600', color: '#64748b',
+              letterSpacing: '0.12em', fontFamily: 'var(--font-display)',
+              marginBottom: '6px', textTransform: 'uppercase',
+            }}>
+              Safety Validation
+            </div>
+            <DecisionLines lines={govLines} />
+            {!govDone && cursor}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
+      <style>{`
+        @keyframes cursorBlink { 0%,100%{opacity:1} 50%{opacity:0} }
+      `}</style>
     </div>
   )
 }
 
-export default function MissionPanel({ status, selectedEvent, decision, isRunning, connected, onTrigger, onReset }) {
+function DecisionLines({ lines }) {
+  return (
+    <div style={{ fontSize: '10.5px', lineHeight: 1.6, fontFamily: 'var(--font-mono)' }}>
+      {lines.map((line, i) => {
+        if (line.type === 'header') {
+          return (
+            <div key={i} style={{
+              fontWeight: '700', color: '#94a3b8', fontSize: '10px',
+              letterSpacing: '0.08em', margin: '6px 0 3px',
+              fontFamily: 'var(--font-display)',
+            }}>
+              {line.text}
+            </div>
+          )
+        }
+        if (line.type === 'kv') {
+          return (
+            <div key={i} style={{ display: 'flex', gap: '6px', margin: '2px 0' }}>
+              <span style={{ color: '#64748b', fontWeight: '600', fontSize: '10px', whiteSpace: 'nowrap' }}>
+                {line.key}
+              </span>
+              <span style={{ color: '#cbd5e1', fontWeight: '500' }}>{line.value}</span>
+            </div>
+          )
+        }
+        if (line.type === 'bullet') {
+          const isPass = /✓|PASS|approved/i.test(line.text)
+          const isFail = /✗|FAIL|rejected/i.test(line.text)
+          return (
+            <div key={i} style={{ display: 'flex', gap: '6px', margin: '2px 0', paddingLeft: '2px' }}>
+              <span style={{
+                color: isPass ? '#34d399' : isFail ? '#f87171' : '#64748b',
+                flexShrink: 0, fontSize: '7px', marginTop: '4px',
+              }}>
+                {isPass ? '✓' : isFail ? '✗' : '●'}
+              </span>
+              <span style={{
+                color: isPass ? '#34d399' : isFail ? '#f87171' : '#94a3b8',
+                fontWeight: (isPass || isFail) ? '600' : '400',
+              }}>
+                {line.text}
+              </span>
+            </div>
+          )
+        }
+        // Default text
+        return (
+          <div key={i} style={{ color: '#94a3b8', margin: '1px 0' }}>
+            {line.text}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export default function MissionPanel({ status, selectedEvent, decision, isRunning, connected, onSimulate, onPushManeuver, onReset }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.MONITORING
   const canTrigger = !isRunning && connected && !!selectedEvent
+  const canPush = !isRunning && decision?.validated
 
   const prob = selectedEvent?.collision_probability ?? 0
   const tca = selectedEvent?.time_to_closest_approach_hours ?? 0
@@ -128,7 +269,49 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
               <span style={{ color: '#64748b' }}>MISS DIST</span>
               <span style={{ color: '#e0f0ff', fontFamily: 'monospace' }}>{selectedEvent.miss_distance_km?.toFixed(3)} km</span>
             </div>
-            {decision && <div style={{ marginTop: '10px' }}><DecisionCard decision={decision} /></div>}
+            {/* Thinking animation while agents work */}
+            {isRunning && !decision && (
+              <div style={{
+                marginTop: '14px', padding: '14px',
+                borderRadius: '6px',
+                background: 'rgba(56,189,248,0.04)',
+                border: '1px solid rgba(56,189,248,0.1)',
+                animation: 'slideIn 0.3s var(--ease-out)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  {/* Brain icon */}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'pulse 1.5s ease-in-out infinite', flexShrink: 0 }}>
+                    <path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/>
+                    <path d="M10 21h4M9 14h6"/>
+                  </svg>
+                  <span style={{ fontSize: '10px', fontWeight: '600', color: '#38bdf8', letterSpacing: '0.1em', fontFamily: 'var(--font-display)' }}>
+                    AGENTS REASONING
+                  </span>
+                  <div style={{ display: 'flex', gap: '3px', marginLeft: '2px' }}>
+                    {[0,1,2].map(i => (
+                      <div key={i} style={{
+                        width: '4px', height: '4px', borderRadius: '50%', background: '#38bdf8',
+                        animation: `thinkDot 1.2s ease-in-out ${i * 0.2}s infinite`,
+                      }} />
+                    ))}
+                  </div>
+                </div>
+                {/* Progress steps */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '2px' }}>
+                  {['Tracking threat level', 'Predicting risk cascade', 'Optimizing maneuvers', 'Negotiating operators', 'Validating safety'].map((step, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
+                      <div style={{
+                        width: '5px', height: '5px', borderRadius: '50%',
+                        background: '#38bdf8', opacity: 0.3,
+                        animation: `stepPulse 2.5s ease-in-out ${i * 0.5}s infinite`,
+                      }} />
+                      <span style={{ color: '#475569' }}>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {decision && <div style={{ marginTop: '10px', animation: 'slideIn 0.3s var(--ease-out)' }}><DecisionCard decision={decision} /></div>}
           </>
         ) : (
           <div style={{ fontSize: '10px', color: '#334155', textAlign: 'center', letterSpacing: '0.06em', paddingTop: '8px' }}>
@@ -141,7 +324,7 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
       {/* Controls — always anchored to bottom */}
       <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <button
-          onClick={() => onTrigger(false, selectedEvent?.id)}
+          onClick={() => onSimulate(selectedEvent?.id)}
           disabled={!canTrigger}
           style={{
             padding: '10px',
@@ -156,7 +339,7 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
           onMouseEnter={e => canTrigger && (e.target.style.background = '#1e3a5f')}
           onMouseLeave={e => canTrigger && (e.target.style.background = '#0d2d4a')}
         >
-          {isRunning ? '⟳ PIPELINE RUNNING...' : '▶ TRIGGER SCENARIO'}
+          {isRunning ? '⟳ AGENTS REASONING...' : '▶ SIMULATE'}
         </button>
 
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -178,22 +361,22 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
             ↺ RESET
           </button>
           <button
-            onClick={() => onTrigger(true, selectedEvent?.id)}
-            disabled={!canTrigger}
+            onClick={onPushManeuver}
+            disabled={!canPush}
             style={{
               flex: 1, padding: '7px',
               background: 'transparent',
-              border: `1px solid ${canTrigger ? '#f4722544' : '#1e3a5f'}`,
+              border: `1px solid ${canPush ? '#34d39944' : '#1e3a5f'}`,
               borderRadius: '4px',
-              color: canTrigger ? '#fb923c' : '#334155',
+              color: canPush ? '#34d399' : '#334155',
               fontSize: '11px', letterSpacing: '0.04em',
-              cursor: canTrigger ? 'pointer' : 'not-allowed',
+              cursor: canPush ? 'pointer' : 'not-allowed',
               fontFamily: 'inherit', transition: 'all 0.2s',
             }}
-            onMouseEnter={e => canTrigger && (e.target.style.background = '#2d1a0d')}
-            onMouseLeave={e => canTrigger && (e.target.style.background = 'transparent')}
+            onMouseEnter={e => canPush && (e.target.style.background = '#0a1f12')}
+            onMouseLeave={e => canPush && (e.target.style.background = 'transparent')}
           >
-            ⚠ KESSLER
+            ↑ PUSH MANEUVER
           </button>
         </div>
 
@@ -206,6 +389,18 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
 
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes thinkDot {
+          0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+          40% { opacity: 1; transform: scale(1.4); }
+        }
+        @keyframes stepPulse {
+          0%, 100% { opacity: 0.2; }
+          20%, 40% { opacity: 1; }
+        }
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
     </div>
   )
