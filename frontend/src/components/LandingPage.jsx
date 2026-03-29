@@ -68,60 +68,6 @@ const TECH_STACK = [
   )},
 ]
 
-function TechMarquee({ visible }) {
-  // Duplicate the list for seamless loop
-  const items = [...TECH_STACK, ...TECH_STACK]
-
-  return (
-    <div style={{
-      width: '100%', overflow: 'hidden',
-      opacity: visible ? 1 : 0,
-      transition: 'opacity 0.8s ease 0.5s',
-      position: 'relative',
-    }}>
-      {/* Fade edges */}
-      <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0, width: '60px', zIndex: 2,
-        background: 'linear-gradient(90deg, rgba(0,0,0,0.8) 0%, transparent 100%)',
-        pointerEvents: 'none',
-      }} />
-      <div style={{
-        position: 'absolute', right: 0, top: 0, bottom: 0, width: '60px', zIndex: 2,
-        background: 'linear-gradient(270deg, rgba(0,0,0,0.8) 0%, transparent 100%)',
-        pointerEvents: 'none',
-      }} />
-
-      <div style={{
-        display: 'flex', gap: '48px', alignItems: 'center',
-        animation: 'marqueeScroll 30s linear infinite',
-        width: 'max-content',
-        padding: '12px 0',
-      }}>
-        {items.map((tech, i) => (
-          <div key={`${tech.name}-${i}`} style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            color: 'rgba(255,255,255,0.25)',
-            flexShrink: 0,
-            transition: 'color 0.3s',
-          }}
-            onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
-          >
-            {tech.icon}
-            <span style={{
-              fontSize: '12px', fontFamily: 'var(--font-display)',
-              fontWeight: '500', letterSpacing: '0.02em',
-              whiteSpace: 'nowrap',
-            }}>
-              {tech.name}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export default function LandingPage({ onEnter }) {
   const [visible, setVisible] = useState(false)
   const [logoReady, setLogoReady] = useState(false)
@@ -413,9 +359,6 @@ export default function LandingPage({ onEnter }) {
             </div>
 
           </div>
-
-          {/* Tech stack — scrolling marquee with logos */}
-          <TechMarquee visible={bottomVisible} />
         </div>
       </div>
       {/* Logo entrance animations */}
