@@ -269,7 +269,49 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
               <span style={{ color: '#64748b' }}>MISS DIST</span>
               <span style={{ color: '#e0f0ff', fontFamily: 'monospace' }}>{selectedEvent.miss_distance_km?.toFixed(3)} km</span>
             </div>
-            {decision && <div style={{ marginTop: '10px' }}><DecisionCard decision={decision} /></div>}
+            {/* Thinking animation while agents work */}
+            {isRunning && !decision && (
+              <div style={{
+                marginTop: '14px', padding: '14px',
+                borderRadius: '6px',
+                background: 'rgba(56,189,248,0.04)',
+                border: '1px solid rgba(56,189,248,0.1)',
+                animation: 'slideIn 0.3s var(--ease-out)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  {/* Brain icon */}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'pulse 1.5s ease-in-out infinite', flexShrink: 0 }}>
+                    <path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/>
+                    <path d="M10 21h4M9 14h6"/>
+                  </svg>
+                  <span style={{ fontSize: '10px', fontWeight: '600', color: '#38bdf8', letterSpacing: '0.1em', fontFamily: 'var(--font-display)' }}>
+                    AGENTS REASONING
+                  </span>
+                  <div style={{ display: 'flex', gap: '3px', marginLeft: '2px' }}>
+                    {[0,1,2].map(i => (
+                      <div key={i} style={{
+                        width: '4px', height: '4px', borderRadius: '50%', background: '#38bdf8',
+                        animation: `thinkDot 1.2s ease-in-out ${i * 0.2}s infinite`,
+                      }} />
+                    ))}
+                  </div>
+                </div>
+                {/* Progress steps */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '2px' }}>
+                  {['Tracking threat level', 'Predicting risk cascade', 'Optimizing maneuvers', 'Negotiating operators', 'Validating safety'].map((step, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
+                      <div style={{
+                        width: '5px', height: '5px', borderRadius: '50%',
+                        background: '#38bdf8', opacity: 0.3,
+                        animation: `stepPulse 2.5s ease-in-out ${i * 0.5}s infinite`,
+                      }} />
+                      <span style={{ color: '#475569' }}>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {decision && <div style={{ marginTop: '10px', animation: 'slideIn 0.3s var(--ease-out)' }}><DecisionCard decision={decision} /></div>}
           </>
         ) : (
           <div style={{ fontSize: '10px', color: '#334155', textAlign: 'center', letterSpacing: '0.06em', paddingTop: '8px' }}>
@@ -347,6 +389,18 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
 
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes thinkDot {
+          0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+          40% { opacity: 1; transform: scale(1.4); }
+        }
+        @keyframes stepPulse {
+          0%, 100% { opacity: 0.2; }
+          20%, 40% { opacity: 1; }
+        }
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
     </div>
   )

@@ -175,7 +175,7 @@ export default function LandingPage({ onEnter }) {
                 objectFit: 'contain',
                 display: 'block',
                 animation: logoReady ? 'logoReveal 1.2s cubic-bezier(0.16,1,0.3,1) both' : 'none',
-                filter: logoReady ? undefined : 'brightness(0)',
+                filter: logoReady ? 'brightness(0.7)' : 'brightness(0)',
               }}
             />
           </div>
@@ -186,6 +186,8 @@ export default function LandingPage({ onEnter }) {
             color: 'rgba(255,255,255,0.45)', lineHeight: 1.4,
             minHeight: '24px',
             paddingLeft: '2px',
+            position: 'relative', zIndex: 2,
+            textShadow: '0 0 8px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.7)',
           }}>
             {tagline}
             <span style={{ animation: 'pulse 1s step-end infinite', color: 'var(--accent)' }}>|</span>
