@@ -1,59 +1,193 @@
-# Sentinel - Space Debris Tracker
+<div align="center">
 
-A data pipeline that downloads orbital tracking data from Space-Track.org, processes it, and exports files for simulation and visualization.
+# SENTINEL
 
-## What Was Updated
+### Autonomous Orbital Traffic Control
 
-### File-by-file changes
+<br>
 
-| File | What I changed | Why it matters |
-|---|---|---|
-| `config.py` | Added `DATA_DIR = "data"` | Gives one shared base path for fallback file detection |
-| `downloader.py` | Added `get_existing_query_files()` and `existing_only` mode in `download_all()` | Lets crawler fetch only datasets that already exist in your project data layout |
-| `etl_pipeline.py` | Download step now defaults to existing-file mode; added `--all-files` override | Prevents pulling extra datasets you are not using, but still allows full fetch when needed |
-| `processor.py` | `_read_csv()` now falls back from `data/raw` to `data/` | ETL works with your current file placement in `data/` root |
-| `scheduler.py` | Scheduler filters each group to existing files only and skips empty groups | Hourly/8h/daily jobs stay aligned with datasets currently in repo |
+**5 AI agents. Real-time negotiation. Zero human delay.**
 
-### Feature meanings
+An autonomous multi-agent system that detects satellite collision risks and coordinates avoidance maneuvers in real-time — the air traffic control layer space is missing.
 
-| Feature | Meaning | Behavior |
-|---|---|---|
-| Existing-only crawling | Crawl only files already present in your `data` workspace | Avoids creating unrelated raw datasets |
-| `data/raw -> data/` fallback | ETL reads from `data/raw` first, then `data/` | Supports mixed or legacy folder layouts |
-| Safe scheduler filtering | Scheduled jobs run only for files that exist | No failing/empty jobs for missing datasets |
-| `--all-files` flag | Explicit full crawl mode | Downloads every query in `config.py` when requested |
+<br>
+
+<img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white" />
+<img src="https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white" />
+<img src="https://img.shields.io/badge/React-18-61DAFB?style=flat&logo=react&logoColor=black" />
+<img src="https://img.shields.io/badge/Three.js-000000?style=flat&logo=threedotjs&logoColor=white" />
+<img src="https://img.shields.io/badge/Claude-Anthropic-191919?style=flat" />
+<img src="https://img.shields.io/badge/Google_ADK-4285F4?style=flat&logo=google&logoColor=white" />
+<img src="https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white" />
+<img src="https://img.shields.io/badge/WebSocket-Live-brightgreen?style=flat" />
+<img src="https://img.shields.io/badge/License-MIT-yellow?style=flat" />
+
+</div>
+
+---
+
+## The Problem
+
+> **65,000+** objects orbit Earth. **12,000+** near-misses happen every year. When two satellites are on a collision course, operators today coordinate via **email and phone calls**. That process takes hours — sometimes longer than the time to impact.
+
+SENTINEL replaces that with an autonomous AI pipeline that detects, reasons, negotiates, and validates avoidance maneuvers in seconds.
 
 ## How It Works
 
 ```
-Space-Track.org API
-        |
-        v
-  downloader.py  -->  data/raw/*.csv
-        |
-        v
-  processor.py   -->  data/processed/*.json
-                 -->  data/analysis/stats.json
+  Conjunction Detected
+         │
+         ▼
+  ┌─────────────┐     ┌──────────────┐     ┌───────────────┐
+  │  TRACKING    │────▶│  PREDICTION  │────▶│ OPTIMIZATION  │
+  │  Assess      │     │  Risk &      │     │  Simulate 3   │
+  │  urgency     │     │  cascade     │     │  maneuver     │
+  └─────────────┘     └──────────────┘     │  options      │
+                                            └───────┬───────┘
+                                                    │
+                                                    ▼
+                       ┌──────────────┐     ┌───────────────┐
+                       │  GOVERNANCE  │◀────│  NEGOTIATION  │
+                       │  Validate    │     │  Which sat    │
+                       │  safety      │     │  moves?       │
+                       └──────┬───────┘     └───────────────┘
+                              │
+                              ▼
+                     Maneuver Approved ✓
 ```
 
-## Commands
+Each agent is powered by an LLM (Claude / Groq / Ollama — configurable) via Google ADK, with **deterministic orbital math** handled separately in a pure-Python physics layer. Agents reason and decide; they never compute trajectories.
 
-| Command | What it does |
-|---|---|
-| `python etl_pipeline.py` | Download + process (existing-file mode by default) |
-| `python etl_pipeline.py --download` | Download only (existing-file mode) |
-| `python etl_pipeline.py --download --all-files` | Download all configured query files |
-| `python etl_pipeline.py --process` | Process local files only |
-| `python etl_pipeline.py --verify` | Show raw/processed file stats |
-| `python scheduler.py --run-now` | Start recurring scheduler and run immediately |
-| `python scheduler.py --once` | Run one scheduler cycle and exit |
+## Features
 
-## Scheduler Intervals
+- **Real-time 3D globe** — Three.js visualization of 29,000+ tracked objects with orbital shells, conjunction lines, and maneuver arcs
+- **Live agent reasoning** — watch each agent think in real-time via WebSocket streaming with typewriter animations
+- **Multi-operator negotiation** — the Negotiation Agent applies operator policy (GPS never maneuvers unless forced) to decide who moves
+- **Governance safety gate** — hard constraints (miss distance > 5km, fuel < 30%, only controllable objects) must pass before any maneuver executes
+- **Auto-retry escalation** — if governance rejects, the pipeline automatically retries with alternative approaches up to 3 times
+- **AI chat assistant** — embedded Sentinel AI with full orbital context for operator Q&A
+- **Real orbital data** — ETL pipeline pulls live TLE data from Space-Track.org
 
-| Group | Interval | Files |
+## Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+
+- API key: `ANTHROPIC_API_KEY` or `GROQ_API_KEY`
+
+### Run locally
+
+```bash
+# Clone
+git clone https://github.com/DinhPhucLe/sentinel.git
+cd sentinel
+
+# Backend
+cd backend
+pip install -r requirements.txt
+python -m uvicorn main:app --reload --port 8000
+
+# Frontend (new terminal)
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173` — click **LAUNCH MISSION CONTROL**.
+
+### Run with Docker
+
+```bash
+docker-compose up
+```
+
+### Configure the AI model
+
+Set `AGENT_MODEL` in `.env` to switch providers:
+
+```env
+# Anthropic (default)
+AGENT_MODEL=anthropic/claude-sonnet-4-6
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Groq (fast, free tier)
+AGENT_MODEL=groq/llama-3.3-70b-versatile
+GROQ_API_KEY=gsk_...
+
+# Local Ollama (no key needed)
+AGENT_MODEL=ollama/llama3
+```
+
+## Project Structure
+
+```
+sentinel/
+├── backend/
+│   ├── main.py                 # FastAPI server, WebSocket, REST endpoints
+│   ├── config.py               # Model config, governance limits
+│   ├── models.py               # Dataclasses (Satellite, ConjunctionEvent)
+│   ├── agents/
+│   │   ├── orchestrator.py     # Sequential pipeline with retry logic
+│   │   ├── tracking_agent.py   # Urgency assessment
+│   │   ├── prediction_agent.py # Risk contextualization
+│   │   ├── optimization_agent.py # Maneuver simulation
+│   │   ├── negotiation_agent.py  # Cross-operator decision
+│   │   └── governance_agent.py   # Safety validation
+│   └── tools/
+│       ├── orbital_sim.py      # Pure-Python orbital math (no LLM)
+│       └── real_data_loader.py # Space-Track.org data integration
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx             # Sidebar navigation, view routing
+│   │   ├── components/
+│   │   │   ├── OrbitCanvas.jsx # Three.js 3D globe + orbits
+│   │   │   ├── AgentLog.jsx    # Live agent reasoning with typewriter
+│   │   │   ├── MissionPanel.jsx # Controls + decision display
+│   │   │   ├── TriageTable.jsx # Conjunction event table
+│   │   │   ├── LandingPage.jsx # Cinematic landing with video bg
+│   │   │   └── SentinelLogo.jsx # Animated SVG logo
+│   │   └── hooks/
+│   │       └── useSimulation.js # WebSocket + API state management
+│   └── public/                 # Video, logo assets
+├── data/                       # Orbital data (TLE, conjunctions)
+├── docker-compose.yml
+└── CLAUDE.md                   # Architecture rules
+```
+
+## Architecture Rules
+
+| Layer | Location | Rule |
 |---|---|---|
-| `orbital_hourly` | 1 hour | `debris_orbital.csv`, `payload_orbital.csv`, `rocket_orbital.csv`, `decay_predictions.csv`, `tip_messages.csv` |
-| `conjunctions_8h` | 8 hours | `conjunctions.csv` |
-| `catalog_daily` | 24 hours | `satcat_all.csv`, `boxscore.csv` |
+| **Deterministic** | `tools/` | Pure math. No LLM imports. Returns floats/dataclasses. |
+| **Agent** | `agents/` | LLM reasoning only. Never computes numbers. |
+| **Orchestrator** | `orchestrator.py` | Agents never call each other — all state flows through the pipeline. |
 
-Note: each group is auto-filtered to only files currently present in `data/raw` or `data/`.
+## Governance Constraints
+
+| Rule | Threshold |
+|---|---|
+| Post-maneuver miss distance | > 5.0 km |
+| Fuel cost per maneuver | < 30% of remaining |
+| Controllability | Only controllable satellites can execute burns |
+| Operator policy | GPS (P1) never maneuvers unless no alternative exists |
+
+## Data Pipeline
+
+SENTINEL includes an ETL pipeline for real orbital data from Space-Track.org:
+
+```bash
+python etl_pipeline.py              # Download + process (existing files)
+python etl_pipeline.py --all-files  # Full download
+python scheduler.py --run-now       # Start recurring updates
+```
+
+## License
+
+MIT License — Phuc Le, 2026
+
+---
+
+<div align="center">
+<sub>Built for HackUSF 2025</sub>
+</div>

@@ -217,8 +217,8 @@ async def chat(body: dict):
     from fastapi import HTTPException
     from litellm import acompletion
 
-    if not os.environ.get("GROQ_API_KEY"):
-        raise HTTPException(status_code=503, detail="GROQ_API_KEY not configured")
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
 
     message = (body.get("message") or "").strip()
     if not message:
@@ -315,14 +315,14 @@ Only emit an action when the user explicitly asks to navigate or toggle a layer.
     t0 = time.time()
     try:
         response = await acompletion(
-            model="groq/llama-3.3-70b-versatile",
+            model="anthropic/claude-sonnet-4-6",
             messages=messages,
             max_tokens=600,
             temperature=0.3,
         )
     except Exception as e:
         logger.error(f"Chat LLM error: {e}")
-        raise HTTPException(status_code=502, detail="AI service unavailable — check GROQ_API_KEY")
+        raise HTTPException(status_code=502, detail="AI service unavailable — check ANTHROPIC_API_KEY")
 
     elapsed_ms = round((time.time() - t0) * 1000)
     text = response.choices[0].message.content or ""
