@@ -244,7 +244,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <img
-                src="/sentinel-logo.png"
+                src="/chatbot-logo.png"
                 alt="Sentinel"
                 style={{ width: '34px', height: '34px', borderRadius: '8px', objectFit: 'cover', border: '1px solid rgba(94,170,187,0.2)' }}
               />
@@ -285,7 +285,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
             {messages.map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '7px' }}>
                 {m.role === 'assistant' && (
-                  <img src="/sentinel-logo.png" alt="" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginBottom: '2px', border: '1px solid rgba(94,170,187,0.15)' }} />
+                  <img src="/chatbot-logo.png" alt="" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginBottom: '2px', border: '1px solid rgba(94,170,187,0.15)' }} />
                 )}
                 <div style={{
                   maxWidth: '82%',
@@ -317,7 +317,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
             {/* Animated loading dots */}
             {loading && (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '7px' }}>
-                <img src="/sentinel-logo.png" alt="" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(94,170,187,0.15)' }} />
+                <img src="/chatbot-logo.png" alt="" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(94,170,187,0.15)' }} />
                 <div style={{ padding: '11px 16px', borderRadius: '3px 14px 14px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', display: 'flex', gap: '5px', alignItems: 'center' }}>
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{
@@ -431,7 +431,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
                 </svg>
               </div>
             )
-            : <img src="/sentinel-logo.png" alt="Sentinel AI" style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover' }} />
+            : <img src="/chatbot-logo.png" alt="Sentinel AI" style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover' }} />
           }
         </button>
       </div>
