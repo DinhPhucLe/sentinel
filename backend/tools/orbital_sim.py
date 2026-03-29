@@ -5,7 +5,6 @@ IMPORTANT: This module must NEVER import from agents/.
 All functions here are pure math — no LLM calls.
 """
 
-import json
 import math
 import os
 import sys
@@ -14,15 +13,11 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from models import Satellite, ConjunctionEvent
-
-# Path resolution works regardless of CWD
-_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data")
+from tools.real_data_loader import get_real_satellites, get_real_scenario
 
 
 def _load_satellites() -> dict[str, Satellite]:
-    path = os.path.join(_DATA_DIR, "mock_satellites.json")
-    with open(path) as f:
-        data = json.load(f)
+    data = get_real_satellites()
     satellites = {}
     for s in data["satellites"]:
         sat = Satellite(
@@ -41,9 +36,13 @@ def _load_satellites() -> dict[str, Satellite]:
 
 
 def _load_scenario() -> dict:
-    path = os.path.join(_DATA_DIR, "scenarios", "collision_course.json")
-    with open(path) as f:
-        return json.load(f)
+    scenario = get_real_scenario()
+    if scenario is None:
+        raise RuntimeError(
+            "No future CDM events available in dataset/data/processed/conjunctions.json. "
+            "Re-download the CDM feed from Space-Track.org."
+        )
+    return scenario
 
 
 def _distance(pos_a: tuple, pos_b: tuple) -> float:
