@@ -37,13 +37,15 @@ function AnimatedNumber({ target, duration = 2000, delay = 0, suffix = '' }) {
 
 export default function LandingPage({ onEnter }) {
   const [visible, setVisible] = useState(false)
+  const [logoReady, setLogoReady] = useState(false)
   const [bottomVisible, setBottomVisible] = useState(false)
-  const tagline = useTyping('Autonomous Multi-Agent Collision Avoidance', 35, 600)
-  const subtitle = useTyping('5 AI agents. Real-time negotiation. Zero human delay.', 30, 2200)
+  const tagline = useTyping('Autonomous Multi-Agent Collision Avoidance', 35, 1400)
+  const subtitle = useTyping('5 AI agents. Real-time negotiation. Zero human delay.', 30, 3000)
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 100)
-    setTimeout(() => setBottomVisible(true), 1600)
+    setTimeout(() => setLogoReady(true), 400)
+    setTimeout(() => setBottomVisible(true), 2200)
   }, [])
 
   const stats = [
@@ -143,37 +145,58 @@ export default function LandingPage({ onEnter }) {
         }}>
           <div style={{
             fontSize: '10px', letterSpacing: '0.3em',
-            color: 'var(--text-tertiary)', marginBottom: '12px',
+            color: 'rgba(255,255,255,0.25)', marginBottom: '6px',
             fontWeight: '600', fontFamily: 'var(--font-display)',
           }}>
             ORBITAL DEFENSE SYSTEM
           </div>
 
-          <h1 style={{
-            fontSize: 'clamp(52px, 7vw, 88px)',
-            fontWeight: '700', fontFamily: 'var(--font-display)',
-            color: '#fff', lineHeight: 0.95,
-            margin: '0 0 20px 0', letterSpacing: '-0.02em',
-          }}>
-            SENTINEL
-          </h1>
-
           <div style={{
-            fontSize: 'clamp(15px, 2vw, 20px)',
-            fontFamily: 'var(--font-body)',
-            color: 'var(--text-secondary)', lineHeight: 1.4,
-            minHeight: '28px',
-            borderLeft: '2px solid var(--text-tertiary)',
-            paddingLeft: '14px',
+            position: 'relative',
+            margin: '-80px 0 -40px -10px',
+            display: 'inline-block',
           }}>
-            {tagline}
-            <span style={{ animation: 'pulse 1s step-end infinite', color: 'var(--text-secondary)' }}>|</span>
+            {/* Glow bloom behind logo */}
+            <div style={{
+              position: 'absolute',
+              inset: '-20%',
+              background: 'radial-gradient(ellipse at center, rgba(0,180,240,0.12) 0%, transparent 70%)',
+              opacity: logoReady ? 1 : 0,
+              transition: 'opacity 1.5s ease 0.8s',
+              pointerEvents: 'none',
+              animation: logoReady ? 'logoBreathe 5s ease-in-out 1.5s infinite' : 'none',
+            }} />
+            <img
+              src="/text_logo.png"
+              alt="SENTINEL"
+              style={{
+                height: 'clamp(140px, 18vw, 220px)',
+                width: 'auto',
+                objectFit: 'contain',
+                display: 'block',
+                animation: logoReady ? 'logoReveal 1.2s cubic-bezier(0.16,1,0.3,1) both' : 'none',
+                filter: logoReady ? 'brightness(0.7)' : 'brightness(0)',
+              }}
+            />
           </div>
 
           <div style={{
-            fontSize: '13px', fontFamily: 'var(--font-body)',
-            color: 'var(--text-tertiary)', marginTop: '8px',
-            minHeight: '18px', paddingLeft: '16px',
+            fontSize: 'clamp(14px, 1.8vw, 18px)',
+            fontFamily: 'var(--font-body)',
+            color: 'rgba(255,255,255,0.45)', lineHeight: 1.4,
+            minHeight: '24px',
+            paddingLeft: '2px',
+            position: 'relative', zIndex: 2,
+            textShadow: '0 0 8px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.7)',
+          }}>
+            {tagline}
+            <span style={{ animation: 'pulse 1s step-end infinite', color: 'var(--accent)' }}>|</span>
+          </div>
+
+          <div style={{
+            fontSize: '12px', fontFamily: 'var(--font-body)',
+            color: 'rgba(255,255,255,0.22)', marginTop: '4px',
+            minHeight: '16px', paddingLeft: '2px',
           }}>
             {subtitle}
           </div>
@@ -286,6 +309,20 @@ export default function LandingPage({ onEnter }) {
           </div>
         </div>
       </div>
+      {/* Logo entrance animations */}
+      <style>{`
+        @keyframes logoReveal {
+          0%   { opacity: 0; transform: scale(0.85) translateY(12px); filter: blur(8px) brightness(2); }
+          30%  { opacity: 0.4; filter: blur(3px) brightness(1.5); }
+          50%  { opacity: 0.7; transform: scale(1.02) translateY(-2px); filter: blur(1px) brightness(1.2); }
+          70%  { opacity: 0.9; transform: scale(0.99) translateY(1px); filter: blur(0) brightness(1.1); }
+          100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0) brightness(1); }
+        }
+        @keyframes logoBreathe {
+          0%, 100% { opacity: 0.7; transform: scale(1); }
+          50%      { opacity: 1; transform: scale(1.05); }
+        }
+      `}</style>
     </div>
   )
 }

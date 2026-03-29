@@ -6,10 +6,11 @@ outputs a prioritised assessment. Does NOT compute probabilities.
 """
 
 from google.adk.agents import LlmAgent
+from config import AGENT_MODEL
 
 tracking_agent = LlmAgent(
     name="tracking_agent",
-    model="groq/llama-3.3-70b-versatile",
+    model=AGENT_MODEL,
     instruction="""You are the Tracking Agent in an Autonomous Orbital Traffic Control system.
 
 Output ONLY the following format. No preamble, no "Certainly!", no extra text. Substitute actual values from the data.

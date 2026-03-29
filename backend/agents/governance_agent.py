@@ -6,10 +6,11 @@ Also has a deterministic backstop enforced in the orchestrator layer.
 """
 
 from google.adk.agents import LlmAgent
+from config import AGENT_MODEL
 
 governance_agent = LlmAgent(
     name="governance_agent",
-    model="groq/llama-3.3-70b-versatile",
+    model=AGENT_MODEL,
     instruction="""You are the Governance Agent in an Autonomous Orbital Traffic Control system.
 
 Output ONLY the following format. No preamble, no "Certainly!", no extra text. Substitute actual values from 'negotiation_decision' in your context.

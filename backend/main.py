@@ -10,9 +10,19 @@ Routes:
 
 import asyncio
 import json
+import logging
 import os
+import traceback
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+
+# ── Logging setup — prints all errors to terminal ──
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger("sentinel")
 
 from dotenv import load_dotenv
 # Load .env from repo root (sentinel/.env) or backend/.env — whichever exists first
@@ -78,6 +88,16 @@ _pipeline_running = False
 
 app = FastAPI(title="Orbital Traffic Control API", version="1.0.0")
 
+@app.on_event("startup")
+async def startup_log():
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    logger.info("=" * 50)
+    logger.info("SENTINEL backend starting")
+    logger.info(f"ANTHROPIC_API_KEY: {'SET (' + key[:12] + '...)' if key else 'NOT SET'}")
+    from config import AGENT_MODEL
+    logger.info(f"Agent model: {AGENT_MODEL}")
+    logger.info("=" * 50)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Frontend dev server
@@ -127,14 +147,19 @@ async def trigger_scenario(body: dict = None):
     async def run():
         global _pipeline_running
         _pipeline_running = True
+        logger.info(f"Pipeline started — kessler={kessler}, event_id={event_id}")
         try:
             from agents.orchestrator import run_pipeline_streaming
 
             async def emit(data: dict):
+                logger.debug(f"WS emit: type={data.get('type')} agent={data.get('agent', '-')}")
                 await manager.broadcast(data)
 
             await run_pipeline_streaming(emit=emit, kessler=kessler, event_id=event_id)
+            logger.info("Pipeline completed successfully")
         except Exception as e:
+            logger.error(f"Pipeline FAILED: {e}")
+            logger.error(traceback.format_exc())
             await manager.broadcast({
                 "type": WS_MSG_ERROR,
                 "message": str(e),
