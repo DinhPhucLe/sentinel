@@ -23,6 +23,8 @@ export function useSimulation() {
   const [status, setStatus] = useState('MONITORING')
   const [satellites, setSatellites] = useState([])
   const [events, setEvents] = useState([])
+  const [conjunctions, setConjunctions] = useState([])
+  const [stats, setStats] = useState(null)
   const [isRunning, setIsRunning] = useState(false)
   const [connected, setConnected] = useState(false)
 
@@ -39,6 +41,16 @@ export function useSimulation() {
     fetch(`${API_BASE}/api/events`)
       .then(r => r.json())
       .then(d => setEvents(d.events || []))
+      .catch(() => {})
+
+    fetch(`${API_BASE}/api/conjunctions`)
+      .then(r => r.json())
+      .then(d => setConjunctions(d.conjunctions || []))
+      .catch(() => {})
+
+    fetch(`${API_BASE}/api/stats`)
+      .then(r => r.json())
+      .then(d => setStats(d))
       .catch(() => {})
   }, [])
 
@@ -151,6 +163,8 @@ export function useSimulation() {
     status,
     satellites,
     events,
+    conjunctions,
+    stats,
     isRunning,
     connected,
     triggerScenario,
