@@ -8,6 +8,7 @@ import SentinelLogo, { SentinelMark } from './components/SentinelLogo'
 import TriageTable from './components/TriageTable'
 import MissionPanel from './components/MissionPanel'
 import ManeuverQueue from './components/ManeuverQueue'
+import LaunchTransition from './components/LaunchTransition'
 
 // ═══ Sidebar ═════════════════════════════════════════════════════════
 
@@ -407,6 +408,12 @@ function Dashboard({ onBack }) {
 export default function App() {
   const [page, setPage] = useState('landing')
 
-  if (page === 'landing') return <LandingPage onEnter={() => setPage('dashboard')} />
+  if (page === 'landing') return <LandingPage onEnter={() => setPage('transitioning')} />
+  if (page === 'transitioning') return (
+    <>
+      <LandingPage onEnter={() => {}} />
+      <LaunchTransition onComplete={() => setPage('dashboard')} />
+    </>
+  )
   return <Dashboard onBack={() => setPage('landing')} />
 }

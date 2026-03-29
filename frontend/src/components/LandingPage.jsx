@@ -51,7 +51,6 @@ export default function LandingPage({ onEnter }) {
   const stats = [
     { value: 65000, label: 'OBJECTS IN ORBIT', suffix: '+' },
     { value: 12000, label: 'NEAR-MISSES / YEAR', suffix: '+' },
-    { value: 0, label: 'AUTOMATED SYSTEMS', special: true },
     { value: 5, label: 'AI AGENTS' },
   ]
 
@@ -153,7 +152,7 @@ export default function LandingPage({ onEnter }) {
 
           <div style={{
             position: 'relative',
-            margin: '-80px 0 -40px -10px',
+            margin: '-110px 0 -30px -10px',
             display: 'inline-block',
           }}>
             {/* Glow bloom behind logo */}
@@ -175,7 +174,7 @@ export default function LandingPage({ onEnter }) {
                 objectFit: 'contain',
                 display: 'block',
                 animation: logoReady ? 'logoReveal 1.2s cubic-bezier(0.16,1,0.3,1) both' : 'none',
-                filter: logoReady ? 'brightness(0.7)' : 'brightness(0)',
+                filter: logoReady ? 'brightness(0.5)' : 'brightness(0)',
               }}
             />
           </div>
@@ -183,11 +182,11 @@ export default function LandingPage({ onEnter }) {
           <div style={{
             fontSize: 'clamp(14px, 1.8vw, 18px)',
             fontFamily: 'var(--font-body)',
-            color: 'rgba(255,255,255,0.45)', lineHeight: 1.4,
+            color: 'rgba(255,255,255,0.85)', lineHeight: 1.4,
             minHeight: '24px',
             paddingLeft: '2px',
             position: 'relative', zIndex: 2,
-            textShadow: '0 0 8px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.7)',
+            textShadow: '0 1px 4px rgba(0,0,0,1), 0 0 16px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.6)',
           }}>
             {tagline}
             <span style={{ animation: 'pulse 1s step-end infinite', color: 'var(--accent)' }}>|</span>
@@ -195,8 +194,10 @@ export default function LandingPage({ onEnter }) {
 
           <div style={{
             fontSize: '12px', fontFamily: 'var(--font-body)',
-            color: 'rgba(255,255,255,0.22)', marginTop: '4px',
+            color: 'rgba(255,255,255,0.55)', marginTop: '4px',
             minHeight: '16px', paddingLeft: '2px',
+            position: 'relative', zIndex: 2,
+            textShadow: '0 1px 4px rgba(0,0,0,1), 0 0 16px rgba(0,0,0,0.9)',
           }}>
             {subtitle}
           </div>
@@ -232,81 +233,70 @@ export default function LandingPage({ onEnter }) {
           flexDirection: 'column',
           gap: '16px',
         }}>
-          {/* Stats row */}
+          {/* Stats — inline row, no cards */}
           <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '1px', background: 'rgba(255,255,255,0.04)',
-            borderRadius: 'var(--radius-sm)', overflow: 'hidden',
+            display: 'flex', alignItems: 'baseline', gap: '32px',
+            justifyContent: 'flex-start',
           }}>
             {stats.map((s, i) => (
               <div key={s.label} style={{
-                background: 'rgba(8,12,20,0.75)',
-                backdropFilter: 'blur(6px)',
-                padding: '16px 14px', textAlign: 'center',
+                opacity: bottomVisible ? 1 : 0,
+                transform: bottomVisible ? 'translateY(0)' : 'translateY(8px)',
+                transition: `all 0.6s ease ${i * 0.12}s`,
               }}>
-                <div style={{
+                <span style={{
                   fontSize: '28px', fontWeight: '700',
                   fontFamily: 'var(--font-mono)',
-                  color: s.special ? 'var(--status-bad)' : '#fff',
-                  lineHeight: 1, marginBottom: '4px',
+                  color: '#fff',
                 }}>
-                  {s.special ? '0' : <AnimatedNumber target={s.value} delay={1800 + i * 200} suffix={s.suffix || ''} />}
-                </div>
-                <div style={{
+                  <AnimatedNumber target={s.value} delay={2400 + i * 250} suffix={s.suffix || ''} />
+                </span>
+                <span style={{
                   fontSize: '9px', fontFamily: 'var(--font-display)',
-                  color: s.special ? 'var(--status-bad)' : 'var(--text-tertiary)',
-                  letterSpacing: '0.1em', fontWeight: s.special ? '600' : '400',
+                  color: 'rgba(255,255,255,0.3)',
+                  letterSpacing: '0.1em', fontWeight: '500',
+                  marginLeft: '8px',
                 }}>
                   {s.label}
-                  {s.special && <span style={{ opacity: 0.5, marginLeft: '6px' }}>UNTIL NOW</span>}
-                </div>
+                </span>
               </div>
             ))}
           </div>
 
-          {/* Pipeline row + footer */}
+          {/* Pipeline + Tech — clean inline */}
           <div style={{
             display: 'flex', alignItems: 'center',
             justifyContent: 'space-between',
+            opacity: bottomVisible ? 1 : 0,
+            transition: 'all 0.6s ease 0.4s',
           }}>
             {/* Pipeline */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               {pipeline.map((name, i) => (
-                <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{
-                    padding: '4px 10px',
                     fontSize: '9px', fontWeight: '600',
                     fontFamily: 'var(--font-display)',
-                    color: 'var(--text-secondary)',
+                    color: 'rgba(255,255,255,0.35)',
                     letterSpacing: '0.08em',
-                    background: 'rgba(8,12,20,0.6)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '4px',
+                    animation: `pipelineFade 5s ease-in-out ${i * 1}s infinite`,
                   }}>
                     {name}
                   </span>
                   {i < pipeline.length - 1 && (
-                    <span style={{ color: 'var(--text-tertiary)', fontSize: '10px', opacity: 0.3 }}>→</span>
+                    <span style={{
+                      color: 'rgba(255,255,255,0.12)', fontSize: '10px',
+                      animation: `pipelineFade 5s ease-in-out ${i * 1 + 0.5}s infinite`,
+                    }}>→</span>
                   )}
                 </div>
               ))}
             </div>
 
-            {/* Tech tags */}
-            <div style={{ display: 'flex', gap: '6px' }}>
-              {['Google ADK', 'Gemini 2.0', 'FastAPI', 'React', 'Three.js'].map(t => (
-                <span key={t} style={{
-                  padding: '3px 8px', fontSize: '8px',
-                  fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-                  letterSpacing: '0.04em',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '3px',
-                }}>
-                  {t}
-                </span>
-              ))}
-            </div>
           </div>
+
+          {/* Tech stack — scrolling marquee with logos */}
+          <TechMarquee visible={bottomVisible} />
         </div>
       </div>
       {/* Logo entrance animations */}
@@ -321,6 +311,10 @@ export default function LandingPage({ onEnter }) {
         @keyframes logoBreathe {
           0%, 100% { opacity: 0.7; transform: scale(1); }
           50%      { opacity: 1; transform: scale(1.05); }
+        }
+        @keyframes pipelineFade {
+          0%, 100% { color: rgba(255,255,255,0.25); }
+          20%, 35% { color: rgba(255,255,255,0.8); }
         }
       `}</style>
     </div>
