@@ -9,7 +9,7 @@ from google.adk.agents import LlmAgent
 
 negotiation_agent = LlmAgent(
     name="negotiation_agent",
-    model="gemini-2.0-flash",
+    model="groq/llama-3.3-70b-versatile",
     instruction="""You are the Negotiation Agent in an Autonomous Orbital Traffic Control system.
 
 Maneuver options are available in your conversation context under 'maneuver_options'.

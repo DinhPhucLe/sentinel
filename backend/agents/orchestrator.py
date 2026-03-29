@@ -22,7 +22,7 @@ from agents.prediction_agent import prediction_agent
 from agents.optimization_agent import optimization_agent
 from agents.negotiation_agent import negotiation_agent
 from agents.governance_agent import governance_agent
-from tools.orbital_sim import get_conjunction_events, get_kessler_cascade_events
+from tools.orbital_sim import get_conjunction_events, get_kessler_cascade_events, simulate_maneuver
 
 APP_NAME = "orbital_traffic_control"
 
@@ -100,8 +100,22 @@ async def run_pipeline_streaming(
             f"miss={ev.miss_distance_km:.2f}km | "
             f"ctrl_a={ev.sat_a.controllable} ctrl_b={ev.sat_b.controllable}"
         )
+    # Pre-compute maneuver simulations for the primary event (SAT-002)
+    maneuver_lines = []
+    for dv in [1.0, 5.0, 15.0]:
+        result = simulate_maneuver("SAT-002", dv)
+        maneuver_lines.append(
+            f"  delta_v={dv} m/s → miss_distance={result['new_miss_distance_km']:.2f} km, "
+            f"fuel_consumed={result['fuel_consumed']:.1f}%, "
+            f"status={result.get('status', 'ok')}"
+        )
+
     initial_brief = (
-        "ACTIVE CONJUNCTION EVENTS — assess immediately:\n" + "\n".join(event_lines)
+        "ACTIVE CONJUNCTION EVENTS — assess immediately:\n"
+        + "\n".join(event_lines)
+        + "\n\nPRE-COMPUTED MANEUVER OPTIONS FOR SAT-002 (Starlink, 62% fuel remaining):\n"
+        + "\n".join(maneuver_lines)
+        + "\n\nSafety minimum: miss distance > 5 km, fuel cost < 30% of remaining fuel."
     )
 
     # Initialise runner lazily (first call only — avoids blocking uvicorn startup)

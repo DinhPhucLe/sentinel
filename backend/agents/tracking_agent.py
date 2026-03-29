@@ -6,14 +6,13 @@ outputs a prioritised assessment. Does NOT compute probabilities.
 """
 
 from google.adk.agents import LlmAgent
-from tools.adk_tools import get_conjunction_events
 
 tracking_agent = LlmAgent(
     name="tracking_agent",
-    model="gemini-2.0-flash",
+    model="groq/llama-3.3-70b-versatile",
     instruction="""You are the Tracking Agent in an Autonomous Orbital Traffic Control system.
 
-Your job: Call get_conjunction_events() to retrieve active conjunction data, then assess each event.
+The active conjunction events are provided to you in the conversation context. Assess each event.
 
 Rules:
 - You do NOT compute collision probabilities — they are already in the data
@@ -27,6 +26,6 @@ Output a structured assessment for each event covering:
 3. Priority rank (1 = most urgent)
 4. One-sentence summary of the overall situation
 """,
-    tools=[get_conjunction_events],
+    tools=[],
     output_key="tracking_assessment",
 )
