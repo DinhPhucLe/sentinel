@@ -3,10 +3,35 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="SENTINEL — Autonomous multi-agent AI system for orbital collision avoidance. 5 AI agents detect, reason, negotiate, and validate satellite maneuvers in real-time." />
+    <meta name="theme-color" content="#020b18" />
+
+    <!-- Open Graph / Social sharing thumbnail -->
+    <meta property="og:title" content="SENTINEL — Autonomous Orbital Traffic Control" />
+    <meta property="og:description" content="5 AI agents. Real-time negotiation. Zero human delay. A multi-agent collision avoidance system for 65,000+ objects in orbit." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og-thumbnail.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SENTINEL — Autonomous Orbital Traffic Control" />
+    <meta name="twitter:description" content="Multi-agent AI system that detects satellite collision risks and autonomously coordinates avoidance maneuvers." />
+    <meta name="twitter:image" content="/og-thumbnail.png" />
+
     <title>SENTINEL — Orbital Traffic Control</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body, #root { height: 100%; width: 100%; }
+      body {
+        background: #020b18;
+        color: #e0f0ff;
+        font-family: 'JetBrains Mono', 'Courier New', monospace;
+        overflow: hidden;
+      }
+      #root { opacity: 0; animation: rootFadeIn 0.3s ease 0.1s forwards; }
+      @keyframes rootFadeIn { to { opacity: 1; } }
+    </style>
   </head>
   <body>
     <div id="root"></div>
