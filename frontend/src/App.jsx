@@ -1,18 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useSimulation } from './hooks/useSimulation'
 import AgentLog from './components/AgentLog'
-import RiskPanel from './components/RiskPanel'
-import ControlPanel from './components/ControlPanel'
 import OrbitCanvas from './components/OrbitCanvas'
 import AnalyticsView from './components/AnalyticsView'
 import LandingPage from './components/LandingPage'
-import SentinelLogo, { SentinelMark } from './components/SentinelLogo'
-
-/*
-  Single-page app. Sidebar switches views.
-  ALL colors from styles.css CSS variables.
-  ALL panels use neo-panel / neo-inset classes.
-*/
+import { SentinelMark } from './components/SentinelLogo'
+import TriageTable from './components/TriageTable'
+import MissionPanel from './components/MissionPanel'
 
 // ═══ Sidebar ═════════════════════════════════════════════════════════
 
@@ -37,192 +31,130 @@ function SideIcon({ children, active, onClick, label }) {
 function Sidebar({ active, onNav, onBack }) {
   return (
     <div style={{
-      width: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center',
-      paddingTop: '14px', gap: '4px', flexShrink: 0,
-      background: 'var(--bg-elevated)', borderRight: '1px solid var(--border-subtle)',
+      width: '52px', flexShrink: 0,
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      padding: '12px 0', gap: '6px',
+      background: 'var(--bg-elevated)',
+      borderRight: '1px solid var(--border-subtle)',
     }}>
-      <div onClick={onBack} title="Back to Landing Page" style={{ cursor: 'pointer', marginBottom: '2px' }}>
-        <SentinelMark size={34} />
-      </div>
+      <div style={{ marginBottom: '8px' }}><SentinelMark size={32} /></div>
+      <div style={{ width: '28px', height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
+
+      {/* Dashboard */}
       <SideIcon active={active === 'dashboard'} onClick={() => onNav('dashboard')} label="Dashboard">
-        <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+        <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
       </SideIcon>
+
+      {/* Mission Control */}
       <SideIcon active={active === 'mission'} onClick={() => onNav('mission')} label="Mission Control">
-        <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+        <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" />
+        <line x1="12" y1="3" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="21" />
+        <line x1="3" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="21" y2="12" />
       </SideIcon>
+
+      {/* Satellites */}
       <SideIcon active={active === 'satellites'} onClick={() => onNav('satellites')} label="Satellites">
-        <circle cx="12" cy="12" r="3" /><path d="M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24" />
+        <path d="M12 2L8 6l4 4 4-4-4-4z" /><path d="M2 12l4 4 4-4-4-4-4 4z" />
+        <path d="M12 22l4-4-4-4-4 4 4 4z" /><path d="M22 12l-4-4-4 4 4 4 4-4z" />
       </SideIcon>
+
+      {/* Alerts */}
       <SideIcon active={active === 'alerts'} onClick={() => onNav('alerts')} label="Alerts">
-        <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
       </SideIcon>
+
+      {/* Spacer */}
       <div style={{ flex: 1 }} />
-      {onBack && (
-        <button onClick={onBack} title="Back to Landing Page" style={{
-          width: '36px', height: '36px', borderRadius: 'var(--radius-sm)',
-          border: '1px solid var(--border-subtle)', background: 'var(--bg-deep)',
-          color: 'var(--text-tertiary)', cursor: 'pointer', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', marginBottom: '14px',
-          transition: 'all 0.25s var(--ease-out)',
-        }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-accent)'; e.currentTarget.style.color = 'var(--accent)' }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--text-tertiary)' }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-        </button>
-      )}
+      <div style={{ width: '28px', height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
+
+      {/* Back to landing */}
+      <SideIcon onClick={onBack} label="Back to Landing">
+        <polyline points="15 18 9 12 15 6" />
+      </SideIcon>
     </div>
   )
 }
 
 // ═══ Header ══════════════════════════════════════════════════════════
 
-function Header({ connected, status, clock }) {
-  return (
-    <header className="neo-panel" style={{
-      display: 'flex', alignItems: 'center', gap: 'var(--space-lg)',
-      padding: '10px 20px', margin: 'var(--space-md) var(--space-md) 0',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '2px', background: 'var(--accent-dim)' }} />
-      <div style={{ marginLeft: '8px' }}><SentinelLogo size={17} /></div>
-      <div style={{ width: '1px', height: '24px', background: 'var(--border-subtle)' }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: connected ? 'var(--status-ok)' : 'var(--status-bad)', animation: 'dotPulse 2.5s ease-in-out infinite' }} />
-        <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: connected ? 'var(--status-ok)' : 'var(--status-bad)', letterSpacing: '0.08em' }}>{connected ? 'LIVE' : 'OFFLINE'}</span>
-      </div>
-      <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{clock}</span>
-      <div style={{ flex: 1 }} />
-      <span style={{ fontSize: '10px', fontFamily: 'var(--font-display)', color: 'var(--text-tertiary)', letterSpacing: '0.1em' }}>PIPELINE: {status}</span>
-    </header>
-  )
+function useLiveClock() {
+  const [t, setT] = useState(new Date())
+  useEffect(() => { const id = setInterval(() => setT(new Date()), 1000); return () => clearInterval(id) }, [])
+  return t.toLocaleTimeString('en-US', { hour12: false, timeZone: 'UTC' }) + ' UTC'
 }
 
-// ═══ Resize Handle ══════════════════════════════════════════════════
+const STATUS_COLORS = {
+  MONITORING: 'var(--accent)', ANALYZING: 'var(--status-warn)',
+  DECIDING: '#a78bfa', VALIDATING: 'var(--status-warn)',
+  AVOIDED: 'var(--status-ok)', ERROR: 'var(--status-bad)',
+}
 
-function ResizeHandle({ direction, onDrag }) {
-  const dragging = useRef(false)
-
-  const onMouseDown = useCallback((e) => {
-    e.preventDefault()
-    dragging.current = true
-    document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize'
-    document.body.style.userSelect = 'none'
-
-    const onMove = (ev) => {
-      if (dragging.current) onDrag(direction === 'horizontal' ? ev.clientX : ev.clientY)
-    }
-    const onUp = () => {
-      dragging.current = false
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }, [direction, onDrag])
-
-  const isH = direction === 'horizontal'
+function Header({ connected, status, clock }) {
   return (
-    <div
-      onMouseDown={onMouseDown}
-      className="resize-handle"
-      style={{
-        position: 'relative', zIndex: 10, flexShrink: 0,
-        width: isH ? '6px' : '100%',
-        height: isH ? '100%' : '6px',
-        cursor: isH ? 'col-resize' : 'row-resize',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-    >
-      <div style={{
-        width: isH ? '2px' : '32px',
-        height: isH ? '32px' : '2px',
-        borderRadius: '2px',
-        background: 'var(--border-subtle)',
-        transition: 'background 0.2s',
-      }} />
+    <div style={{
+      height: '44px', flexShrink: 0,
+      display: 'flex', alignItems: 'center',
+      padding: '0 var(--space-lg)', gap: '16px',
+      background: 'var(--bg-elevated)',
+      borderBottom: '1px solid var(--border-subtle)',
+    }}>
+      <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-heading)', fontFamily: 'var(--font-display)', letterSpacing: '0.14em' }}>
+        SENTINEL
+      </span>
+      <span style={{ fontSize: '9px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-display)', letterSpacing: '0.1em' }}>
+        ORBITAL TRAFFIC CONTROL
+      </span>
+      <div style={{ flex: 1 }} />
+      <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{clock}</span>
+      <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: '600', color: STATUS_COLORS[status] || 'var(--accent)', letterSpacing: '0.08em' }}>
+        {status}
+      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10px', color: connected ? 'var(--status-ok)' : 'var(--status-bad)', fontFamily: 'var(--font-mono)' }}>
+        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: connected ? 'var(--status-ok)' : 'var(--status-bad)', animation: connected ? 'dotPulse 2s ease-in-out infinite' : 'none' }} />
+        {connected ? 'LIVE' : 'OFFLINE'}
+      </div>
     </div>
   )
 }
 
-// ═══ Mission Control View ════════════════════════════════════════════
+// ═══ Mission View (our working layout) ═══════════════════════════════
 
 function MissionView({ sim }) {
-  const containerRef = useRef(null)
-  const [rightW, setRightW] = useState(300)
-  const [bottomH, setBottomH] = useState(220)
+  const [selectedEvent, setSelectedEvent] = useState(null)
 
-  const onDragCol = useCallback((x) => {
-    const el = containerRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    const newRight = Math.max(200, Math.min(500, rect.right - x - 12))
-    setRightW(newRight)
-  }, [])
-
-  const onDragRow = useCallback((y) => {
-    const el = containerRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    const newBottom = Math.max(120, Math.min(rect.height * 0.6, rect.bottom - y - 12))
-    setBottomH(newBottom)
-  }, [])
+  const handleSelect = (ev) => setSelectedEvent(prev => prev?.id === ev.id ? null : ev)
+  const handleReset = () => { sim.reset(); setSelectedEvent(null) }
 
   return (
-    <div ref={containerRef} style={{
-      display: 'flex', flexDirection: 'column',
-      flex: 1, minHeight: 0, overflow: 'hidden',
+    <div style={{
+      flex: 1, minHeight: 0,
+      display: 'grid',
+      gridTemplateColumns: '3fr 2fr',
+      gap: 'var(--space-md)',
+      overflow: 'hidden',
     }}>
-      {/* Top row: orbit canvas + right sidebar */}
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {/* Orbit canvas */}
-        <div className="neo-panel grid-bg" style={{ flex: 1, minWidth: 0, overflow: 'hidden', position: 'relative' }}>
+      {/* Left — orbit canvas + agent log */}
+      <div style={{ display: 'grid', gridTemplateRows: '1fr 200px', gap: 'var(--space-md)', minHeight: 0 }}>
+        <div className="neo-panel" style={{ overflow: 'hidden', minHeight: 0, height: '100%' }}>
           <OrbitCanvas satellites={sim.satellites} events={sim.events} decision={sim.decision} status={sim.status} />
         </div>
-
-        <ResizeHandle direction="horizontal" onDrag={onDragCol} />
-
-        {/* Right sidebar */}
-        <div style={{ width: rightW, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', overflowY: 'auto', overflowX: 'hidden' }}>
-          <RiskPanel status={sim.status} events={sim.events} decision={sim.decision} />
-          <ControlPanel isRunning={sim.isRunning} connected={sim.connected} onTrigger={sim.triggerScenario} onReset={sim.reset} />
-        </div>
+        <AgentLog messages={sim.agentMessages} />
       </div>
 
-      <ResizeHandle direction="vertical" onDrag={onDragRow} />
-
-      {/* Bottom row: agent log + satellite roster */}
-      <div style={{ height: bottomH, flexShrink: 0, display: 'flex', gap: 'var(--space-md)', minHeight: 0 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <AgentLog messages={sim.agentMessages} />
-        </div>
-        <div className="neo-panel" style={{ width: rightW, flexShrink: 0, padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ fontSize: '10px', letterSpacing: '0.14em', color: 'var(--text-secondary)', fontWeight: '600', fontFamily: 'var(--font-display)', paddingBottom: '8px', marginBottom: '8px', borderBottom: '1px solid var(--border-subtle)' }}>
-            SATELLITE ROSTER <span style={{ float: 'right', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-tertiary)' }}>{sim.satellites.length}</span>
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            {sim.satellites.map((sat, i) => {
-              const f = (sat.fuel_remaining * 100).toFixed(0)
-              return (
-                <div key={sat.id} className="neo-inset" style={{ padding: '8px 10px', marginBottom: '6px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '3px' }}>
-                    <span style={{ color: 'var(--text-heading)', fontFamily: 'var(--font-display)', fontWeight: '600' }}>{sat.name}</span>
-                    <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{sat.controllable ? 'CTRL' : 'INERT'}</span>
-                  </div>
-                  <div style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'flex', gap: '6px' }}><span>{sat.id}</span><span>P{sat.priority}</span></div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                    <div style={{ flex: 1, height: '2px', background: 'var(--bg-surface)', borderRadius: '1px', overflow: 'hidden' }}><div style={{ width: `${f}%`, height: '100%', background: 'var(--accent-dim)', borderRadius: '1px' }} /></div>
-                    <span>{f}%</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+      {/* Right — triage table + mission panel */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', minHeight: 0, overflow: 'hidden' }}>
+        <TriageTable events={sim.events} selectedId={selectedEvent?.id} onSelect={handleSelect} />
+        <MissionPanel
+          status={sim.status}
+          selectedEvent={selectedEvent}
+          decision={sim.decision}
+          isRunning={sim.isRunning}
+          connected={sim.connected}
+          onTrigger={sim.triggerScenario}
+          onReset={handleReset}
+        />
       </div>
     </div>
   )
@@ -239,7 +171,7 @@ function SatellitesView({ satellites }) {
   ]
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-md)' }}>
-      {list.map((sat, i) => {
+      {list.map(sat => {
         const f = (sat.fuel_remaining * 100).toFixed(0)
         return (
           <div key={sat.id} className="neo-panel" style={{ padding: 'var(--space-lg)' }}>
@@ -265,7 +197,7 @@ function SatellitesView({ satellites }) {
 // ═══ Alerts View ═════════════════════════════════════════════════════
 
 const ALERTS = [
-  { sev: 'critical', text: 'SAT-001 \u2194 SAT-002 collision probability 82%', time: '2m ago' },
+  { sev: 'critical', text: 'SAT-001 ↔ SAT-002 collision probability 82%', time: '2m ago' },
   { sev: 'high', text: 'DEBRIS-001 entering GPS constellation altitude', time: '8m ago' },
   { sev: 'medium', text: 'Starlink fuel reserves below 40% threshold', time: '15m ago' },
   { sev: 'low', text: 'ISS orbit adjustment scheduled next pass', time: '1h ago' },
@@ -289,15 +221,7 @@ function AlertsView() {
   )
 }
 
-// ═══ Clock Hook ══════════════════════════════════════════════════════
-
-function useLiveClock() {
-  const [t, setT] = useState(new Date())
-  useEffect(() => { const id = setInterval(() => setT(new Date()), 1000); return () => clearInterval(id) }, [])
-  return t.toLocaleTimeString('en-US', { hour12: false, timeZone: 'UTC' }) + ' UTC'
-}
-
-// ═══ Dashboard (sidebar app) ═════════════════════════════════════════
+// ═══ Dashboard ═══════════════════════════════════════════════════════
 
 function Dashboard({ onBack }) {
   const sim = useSimulation()
@@ -307,59 +231,29 @@ function Dashboard({ onBack }) {
   return (
     <div style={{ display: 'flex', height: '100vh', background: 'var(--bg-deep)', overflow: 'hidden' }}>
       <Sidebar active={view} onNav={setView} onBack={onBack} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Header connected={sim.connected} status={sim.status} clock={clock} />
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 'var(--space-md)', minHeight: 0, overflow: view === 'mission' ? 'hidden' : 'auto' }}>
-          {view === 'dashboard' && <AnalyticsView sim={sim} />}
-          {view === 'mission' && <MissionView sim={sim} />}
-          {view === 'satellites' && <SatellitesView satellites={sim.satellites} />}
-          {view === 'alerts' && <AlertsView />}
+        <main style={{
+          flex: 1, display: 'flex', flexDirection: 'column',
+          padding: view === 'mission' ? 'var(--space-md)' : 'var(--space-md)',
+          minHeight: 0,
+          overflow: view === 'mission' ? 'hidden' : 'auto',
+        }}>
+          {view === 'dashboard'   && <AnalyticsView sim={sim} />}
+          {view === 'mission'     && <MissionView sim={sim} />}
+          {view === 'satellites'  && <SatellitesView satellites={sim.satellites} />}
+          {view === 'alerts'      && <AlertsView />}
         </main>
       </div>
     </div>
   )
 }
 
-// ═══ Root — Landing Page → Dashboard with smooth transition ═════════
+// ═══ App ═════════════════════════════════════════════════════════════
 
 export default function App() {
   const [page, setPage] = useState('landing')
-  const [transitioning, setTransitioning] = useState(false)
 
-  const handleLaunch = useCallback(() => {
-    setTransitioning(true)
-    setTimeout(() => { setPage('dashboard'); setTransitioning(false) }, 900)
-  }, [])
-
-  const handleBack = useCallback(() => {
-    setTransitioning(true)
-    setTimeout(() => { setPage('landing'); setTransitioning(false) }, 600)
-  }, [])
-
-  return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: 'var(--bg-deep)' }}>
-      {/* Transition overlay */}
-      {transitioning && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 100, pointerEvents: 'none',
-          background: 'var(--bg-deep)',
-          animation: page === 'landing'
-            ? 'fadeOverlayIn 0.5s ease forwards, fadeOverlayOut 0.5s ease 0.5s forwards'
-            : 'fadeOverlayIn 0.4s ease forwards, fadeOverlayOut 0.5s ease 0.5s forwards',
-        }} />
-      )}
-
-      {page === 'landing' && (
-        <div style={{ position: 'absolute', inset: 0, animation: transitioning ? 'pageExitWarp 0.8s ease-in both' : 'pageEnterFade 0.6s var(--ease-out) both' }}>
-          <LandingPage onEnter={handleLaunch} />
-        </div>
-      )}
-
-      {page === 'dashboard' && (
-        <div style={{ position: 'absolute', inset: 0, animation: transitioning ? 'pageExitZoom 0.6s ease-in both' : 'pageEnterZoom 0.6s var(--ease-out) both' }}>
-          <Dashboard onBack={handleBack} />
-        </div>
-      )}
-    </div>
-  )
+  if (page === 'landing') return <LandingPage onEnter={() => setPage('dashboard')} />
+  return <Dashboard onBack={() => setPage('landing')} />
 }
