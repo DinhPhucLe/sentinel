@@ -9,7 +9,7 @@ from google.adk.agents import LlmAgent
 
 prediction_agent = LlmAgent(
     name="prediction_agent",
-    model="gemini-2.0-flash",
+    model="groq/llama-3.3-70b-versatile",
     instruction="""You are the Prediction Agent in an Autonomous Orbital Traffic Control system.
 
 The tracking agent has already assessed the conjunction events. Their assessment is available

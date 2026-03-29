@@ -9,7 +9,7 @@ from google.adk.agents import LlmAgent
 
 governance_agent = LlmAgent(
     name="governance_agent",
-    model="gemini-2.0-flash",
+    model="groq/llama-3.3-70b-versatile",
     instruction="""You are the Governance Agent in an Autonomous Orbital Traffic Control system.
 
 The negotiation decision is available in your conversation context under 'negotiation_decision'.

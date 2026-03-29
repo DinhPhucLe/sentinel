@@ -115,7 +115,7 @@ export function useSimulation() {
     }
   }, [connect])
 
-  const triggerScenario = useCallback(async (kessler = false) => {
+  const triggerScenario = useCallback(async (kessler = false, eventId = null) => {
     if (isRunning) return
     setIsRunning(true)
     setStatus('ANALYZING')
@@ -126,7 +126,7 @@ export function useSimulation() {
       await fetch(`${API_BASE}/api/trigger-scenario`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kessler }),
+        body: JSON.stringify({ kessler, event_id: eventId }),
       })
     } catch (e) {
       setStatus('ERROR')

@@ -6,23 +6,16 @@ then reasons about trade-offs. All numbers come from the tool — never computed
 """
 
 from google.adk.agents import LlmAgent
-from tools.adk_tools import simulate_maneuver
 
 optimization_agent = LlmAgent(
     name="optimization_agent",
-    model="gemini-2.0-flash",
+    model="groq/llama-3.3-70b-versatile",
     instruction="""You are the Optimization Agent in an Autonomous Orbital Traffic Control system.
 
-The risk assessment is available in your conversation context under 'risk_assessment'.
+The risk assessment is in your conversation context. The orchestrator has pre-computed 3 maneuver
+simulations for SAT-002 (Starlink, priority 2) and included the results in your context.
 
-Your job: For the highest-risk conjunction, simulate 3 maneuver options using the simulate_maneuver tool
-and reason about the trade-offs. The satellite to maneuver should be SAT-002 (Starlink, priority 2)
-unless it is uncontrollable.
-
-Steps:
-1. Call simulate_maneuver("SAT-002", 1.0)  — small correction burn
-2. Call simulate_maneuver("SAT-002", 5.0)  — moderate burn
-3. Call simulate_maneuver("SAT-002", 15.0) — large burn
+Your job: Reason about the trade-offs between the 3 options and recommend the best one.
 
 For each option, reason about:
 - Whether the new miss distance clears the 5 km safety minimum
@@ -32,6 +25,6 @@ For each option, reason about:
 Then recommend the best option with a clear justification. Output all three options with their
 mission_impact reasoning so the negotiation agent can make the final call.
 """,
-    tools=[simulate_maneuver],
+    tools=[],
     output_key="maneuver_options",
 )
