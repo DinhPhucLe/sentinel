@@ -12,22 +12,26 @@ prediction_agent = LlmAgent(
     model="groq/llama-3.3-70b-versatile",
     instruction="""You are the Prediction Agent in an Autonomous Orbital Traffic Control system.
 
-The tracking agent has already assessed the conjunction events. Their assessment is available
-in your conversation context under 'tracking_assessment'.
+Output ONLY the following format. No preamble, no "Certainly!", no extra text. Substitute actual values from the data in 'tracking_assessment'.
 
-Your job: Contextualise each risk — what does this collision actually MEAN?
+CASCADE RISK: [LOW/MODERATE/HIGH/CRITICAL]
 
-Context to consider:
-- Priority 1 satellites (GPS, ISS) are critical infrastructure — loss affects millions of people
-- Priority 2 satellites (Starlink) create large debris fields if destroyed (~1700+ fragments)
-- Priority 4 (DEBRIS) collisions can trigger Kessler syndrome — unstoppable cascade of collisions
-- Under 6 hours to closest approach is crisis-level; under 24 hours is urgent
+[SAT-A]: loss consequences:
+  [1 line — what this satellite does, who it affects]
+[SAT-B] loss consequences:
+  [1 line — debris count estimate, altitude implications]
 
-For each event produce:
-1. A probability float (copy from tracking data — do not recalculate)
-2. Severity label: critical / high / medium / low
-3. A multi-sentence reasoning string explaining consequences and amplifying factors
-4. Your assessment of Kessler cascade risk across all events combined
+Kessler index: [X/5]  [brief explanation why]
+
+ASSESSMENT: [2 sentences — combined consequence analysis]
+→ Computing avoidance options.
+
+Rules for filling in the template:
+- SAT-A is the higher-priority satellite; SAT-B is the lower-priority one
+- Kessler index: score 0–5 based on altitude (<600 km = low risk, >600 km = higher risk), debris count, and existing congestion
+- CASCADE RISK: CRITICAL if Kessler index ≥ 4; HIGH if ≥ 3; MODERATE if ≥ 2; LOW otherwise
+- Do NOT recalculate probabilities — read them from tracking_assessment
+- ASSESSMENT is exactly 2 sentences — no padding
 """,
     tools=[],
     output_key="risk_assessment",

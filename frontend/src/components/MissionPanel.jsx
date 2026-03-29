@@ -65,9 +65,10 @@ function DecisionCard({ decision }) {
   )
 }
 
-export default function MissionPanel({ status, selectedEvent, decision, isRunning, connected, onTrigger, onReset }) {
+export default function MissionPanel({ status, selectedEvent, decision, isRunning, connected, onSimulate, onPushManeuver, onReset }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.MONITORING
   const canTrigger = !isRunning && connected && !!selectedEvent
+  const canPush = !isRunning && decision?.validated
 
   const prob = selectedEvent?.collision_probability ?? 0
   const tca = selectedEvent?.time_to_closest_approach_hours ?? 0
@@ -141,7 +142,7 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
       {/* Controls — always anchored to bottom */}
       <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <button
-          onClick={() => onTrigger(false, selectedEvent?.id)}
+          onClick={() => onSimulate(selectedEvent?.id)}
           disabled={!canTrigger}
           style={{
             padding: '10px',
@@ -156,7 +157,7 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
           onMouseEnter={e => canTrigger && (e.target.style.background = '#1e3a5f')}
           onMouseLeave={e => canTrigger && (e.target.style.background = '#0d2d4a')}
         >
-          {isRunning ? '⟳ PIPELINE RUNNING...' : '▶ TRIGGER SCENARIO'}
+          {isRunning ? '⟳ AGENTS REASONING...' : '▶ SIMULATE'}
         </button>
 
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -178,22 +179,22 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
             ↺ RESET
           </button>
           <button
-            onClick={() => onTrigger(true, selectedEvent?.id)}
-            disabled={!canTrigger}
+            onClick={onPushManeuver}
+            disabled={!canPush}
             style={{
               flex: 1, padding: '7px',
               background: 'transparent',
-              border: `1px solid ${canTrigger ? '#f4722544' : '#1e3a5f'}`,
+              border: `1px solid ${canPush ? '#34d39944' : '#1e3a5f'}`,
               borderRadius: '4px',
-              color: canTrigger ? '#fb923c' : '#334155',
+              color: canPush ? '#34d399' : '#334155',
               fontSize: '11px', letterSpacing: '0.04em',
-              cursor: canTrigger ? 'pointer' : 'not-allowed',
+              cursor: canPush ? 'pointer' : 'not-allowed',
               fontFamily: 'inherit', transition: 'all 0.2s',
             }}
-            onMouseEnter={e => canTrigger && (e.target.style.background = '#2d1a0d')}
-            onMouseLeave={e => canTrigger && (e.target.style.background = 'transparent')}
+            onMouseEnter={e => canPush && (e.target.style.background = '#0a1f12')}
+            onMouseLeave={e => canPush && (e.target.style.background = 'transparent')}
           >
-            ⚠ KESSLER
+            ↑ PUSH MANEUVER
           </button>
         </div>
 

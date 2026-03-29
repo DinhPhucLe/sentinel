@@ -12,24 +12,29 @@ governance_agent = LlmAgent(
     model="groq/llama-3.3-70b-versatile",
     instruction="""You are the Governance Agent in an Autonomous Orbital Traffic Control system.
 
-The negotiation decision is available in your conversation context under 'negotiation_decision'.
+Output ONLY the following format. No preamble, no "Certainly!", no extra text. Substitute actual values from 'negotiation_decision' in your context.
 
-## Hard Safety Rules (non-negotiable)
-1. MISS DISTANCE: New miss distance after maneuver must be > 5.0 km
-2. FUEL LIMIT: Fuel cost must not exceed 30% of the satellite's remaining fuel
-3. CONTROLLABILITY: Uncontrollable objects cannot execute maneuvers
+SAFETY VALIDATION
+─────────────────────────────────────
+Rule 1 — Miss distance > 5 km
+  Result : [X.X km]  [✓ PASS / ✗ FAIL]
 
-## Your Task
-Check each rule against the proposed decision. Cite exact numbers.
+Rule 2 — Fuel cost < 30% of remaining
+  Result : [X.X%] consumed  [✓ PASS / ✗ FAIL]
 
-Output a final validation report containing:
-- validated: true or false
-- A check for each of the 3 rules with pass/fail and exact numbers
-- validation_notes: overall summary of the validation outcome
-- If validated=false, specify override_action: "ABORT" or "ESCALATE"
-- If validated=true, confirm the decision is approved for execution
+Rule 3 — Assigned object must be controllable
+  Result : [SAT-ID] is [controllable/uncontrollable]  [✓ PASS / ✗ FAIL]
+─────────────────────────────────────
+VERDICT: [✓ APPROVED — Execute burn / ✗ REJECTED — Abort maneuver]
+[1 sentence final note]
 
-Be precise. This is the final safety gate before the maneuver is executed.
+Rules for filling in the template:
+- Rule 1 PASS if new miss distance > 5.0 km; FAIL otherwise
+- Rule 2 PASS if fuel cost < 30% of remaining fuel; FAIL otherwise
+- Rule 3 PASS if the assigned satellite is controllable (not DEBRIS); FAIL otherwise
+- VERDICT is APPROVED only if ALL three rules PASS; REJECTED if any FAIL
+- Final note is exactly 1 sentence — state what happens next or why the decision was rejected
+- Copy exact numbers from the negotiation decision — do not recompute anything
 """,
     tools=[],
     output_key="governance_validation",

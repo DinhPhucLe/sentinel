@@ -7,6 +7,7 @@ import LandingPage from './components/LandingPage'
 import { SentinelMark } from './components/SentinelLogo'
 import TriageTable from './components/TriageTable'
 import MissionPanel from './components/MissionPanel'
+import ManeuverQueue from './components/ManeuverQueue'
 
 // ═══ Sidebar ═════════════════════════════════════════════════════════
 
@@ -123,9 +124,35 @@ function Header({ connected, status, clock }) {
 
 function MissionView({ sim }) {
   const [selectedEvent, setSelectedEvent] = useState(null)
+  const [simMode, setSimMode] = useState(null)       // { satAId, satBId } | null
+  const [maneuverQueue, setManeuverQueue] = useState([])
 
   const handleSelect = (ev) => setSelectedEvent(prev => prev?.id === ev.id ? null : ev)
-  const handleReset = () => { sim.reset(); setSelectedEvent(null) }
+
+  const handleReset = () => {
+    sim.reset()
+    setSelectedEvent(null)
+    setSimMode(null)
+  }
+
+  const handleSimulate = (eventId) => {
+    if (!selectedEvent) return
+    setSimMode({ satAId: selectedEvent.sat_a?.id, satBId: selectedEvent.sat_b?.id })
+    sim.triggerScenario(false, eventId)
+  }
+
+  const handleEndSim = () => setSimMode(null)
+
+  const handlePushManeuver = () => {
+    if (!sim.decision || !selectedEvent) return
+    setManeuverQueue(prev => [...prev, {
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      satA: selectedEvent.sat_a,
+      satB: selectedEvent.sat_b,
+      decision: sim.decision,
+    }])
+  }
 
   return (
     <div style={{
@@ -135,12 +162,24 @@ function MissionView({ sim }) {
       gap: 'var(--space-md)',
       overflow: 'hidden',
     }}>
-      {/* Left — orbit canvas + agent log */}
-      <div style={{ display: 'grid', gridTemplateRows: '1fr 200px', gap: 'var(--space-md)', minHeight: 0 }}>
+      {/* Left — orbit canvas + bottom panels */}
+      <div style={{ display: 'grid', gridTemplateRows: '1fr 240px', gap: 'var(--space-md)', minHeight: 0 }}>
         <div className="neo-panel" style={{ overflow: 'hidden', minHeight: 0, height: '100%' }}>
-          <OrbitCanvas satellites={sim.satellites} events={sim.events} decision={sim.decision} status={sim.status} />
+          <OrbitCanvas
+            satellites={sim.satellites}
+            events={sim.events}
+            decision={sim.decision}
+            status={sim.status}
+            simMode={simMode}
+            agentMessages={sim.agentMessages}
+            onEndSim={handleEndSim}
+          />
         </div>
-        <AgentLog messages={sim.agentMessages} />
+        {/* Bottom row: Agent Log + Maneuver Queue 50/50 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)', minHeight: 0 }}>
+          <AgentLog messages={sim.agentMessages} />
+          <ManeuverQueue queue={maneuverQueue} />
+        </div>
       </div>
 
       {/* Right — triage table + mission panel */}
@@ -152,7 +191,8 @@ function MissionView({ sim }) {
           decision={sim.decision}
           isRunning={sim.isRunning}
           connected={sim.connected}
-          onTrigger={sim.triggerScenario}
+          onSimulate={handleSimulate}
+          onPushManeuver={handlePushManeuver}
           onReset={handleReset}
         />
       </div>
