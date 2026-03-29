@@ -31,12 +31,30 @@ const BARS = [
   { label: 'NEG', value: 1.5 },
   { label: 'GOV', value: 0.6 },
 ]
-const DONUT = [
+const STATIC_DONUT = [
   { label: 'Critical', value: 3 },
   { label: 'High', value: 4 },
   { label: 'Medium', value: 5 },
   { label: 'Low', value: 12 },
 ]
+
+function buildDonutFromConjunctions(conjunctions) {
+  if (!conjunctions || conjunctions.length === 0) return STATIC_DONUT
+  let critical = 0, high = 0, medium = 0, low = 0
+  conjunctions.forEach(ev => {
+    const pc = ev.collision_probability ?? 0
+    if (pc >= 0.007) critical++
+    else if (pc >= 0.004) high++
+    else if (pc >= 0.002) medium++
+    else low++
+  })
+  return [
+    { label: 'Critical', value: critical || 0 },
+    { label: 'High', value: high || 0 },
+    { label: 'Medium', value: medium || 0 },
+    { label: 'Low', value: low || 0 },
+  ]
+}
 
 // ═══ Hooks ═══════════════════════════════════════════════════════════
 
@@ -156,8 +174,10 @@ function Label({ children }) {
 // ═══ Analytics View ══════════════════════════════════════════════════
 
 export default function AnalyticsView({ sim }) {
-  const tracked = useLiveCounter(65247)
+  const totalObjects = sim?.stats?.total_objects ?? 65247
+  const tracked = useLiveCounter(totalObjects)
   const maneuvers = useLiveCounter(342)
+  const DONUT = buildDonutFromConjunctions(sim?.conjunctions)
   const { log, typing, agent: typingAgent } = useTypingFeed(AGENT_FEED)
 
   return (
