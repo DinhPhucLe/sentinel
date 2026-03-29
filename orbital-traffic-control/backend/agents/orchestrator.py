@@ -35,24 +35,32 @@ AGENT_ORDER = [
     "governance_agent",
 ]
 
-# Build the sequential pipeline
-pipeline = SequentialAgent(
-    name="orbital_pipeline",
-    sub_agents=[
-        tracking_agent,
-        prediction_agent,
-        optimization_agent,
-        negotiation_agent,
-        governance_agent,
-    ],
-)
+# Lazily initialised — built on first call to run_pipeline_streaming
+_pipeline = None
+_session_service = None
+_runner = None
 
-_session_service = InMemorySessionService()
-_runner = Runner(
-    agent=pipeline,
-    app_name=APP_NAME,
-    session_service=_session_service,
-)
+
+def _get_runner() -> Runner:
+    global _pipeline, _session_service, _runner
+    if _runner is None:
+        _pipeline = SequentialAgent(
+            name="orbital_pipeline",
+            sub_agents=[
+                tracking_agent,
+                prediction_agent,
+                optimization_agent,
+                negotiation_agent,
+                governance_agent,
+            ],
+        )
+        _session_service = InMemorySessionService()
+        _runner = Runner(
+            agent=_pipeline,
+            app_name=APP_NAME,
+            session_service=_session_service,
+        )
+    return _runner
 
 
 def _ts() -> str:
@@ -96,6 +104,9 @@ async def run_pipeline_streaming(
         "ACTIVE CONJUNCTION EVENTS — assess immediately:\n" + "\n".join(event_lines)
     )
 
+    # Initialise runner lazily (first call only — avoids blocking uvicorn startup)
+    runner = _get_runner()
+
     # Create a fresh session per run
     user_id = "operator"
     session_id = f"run-{uuid.uuid4().hex[:8]}"
@@ -124,7 +135,7 @@ async def run_pipeline_streaming(
         parts=[genai_types.Part(text=initial_brief)],
     )
 
-    async for event in _runner.run_async(
+    async for event in runner.run_async(
         user_id=user_id,
         session_id=session_id,
         new_message=new_message,
@@ -159,7 +170,7 @@ async def run_pipeline_streaming(
             await asyncio.sleep(0.1)
 
     # Emit the governance output as the final decision signal
-    session = _session_service.get_session(
+    session = _session_service.get_session(  # noqa: uses module-level ref set by _get_runner()
         app_name=APP_NAME, user_id=user_id, session_id=session_id
     )
     governance_output = session.state.get("governance_validation", "") if session else ""

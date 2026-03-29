@@ -23,7 +23,6 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from models import Satellite, ConjunctionEvent
 from tools.orbital_sim import get_conjunction_events, get_kessler_cascade_events
-from agents.orchestrator import run_pipeline_streaming
 from config import WS_MSG_AGENT, WS_MSG_DECISION, WS_MSG_STATUS, WS_MSG_ERROR
 
 _DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
@@ -115,6 +114,8 @@ async def trigger_scenario(body: dict = None):
         global _pipeline_running
         _pipeline_running = True
         try:
+            from agents.orchestrator import run_pipeline_streaming
+
             async def emit(data: dict):
                 await manager.broadcast(data)
 
