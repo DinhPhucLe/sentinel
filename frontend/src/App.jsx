@@ -9,6 +9,7 @@ import TriageTable from './components/TriageTable'
 import MissionPanel from './components/MissionPanel'
 import ChatBot from './components/ChatBot'
 import ManeuverQueue from './components/ManeuverQueue'
+import LaunchTransition from './components/LaunchTransition'
 
 // ═══ Sidebar ═════════════════════════════════════════════════════════
 
@@ -429,8 +430,14 @@ function Dashboard({ onBack }) {
 // ═══ App ═════════════════════════════════════════════════════════════
 
 export default function App() {
-  const [page, setPage] = useState('landing')
+  const [page, setPage] = useState('landing') // landing | transition | dashboard
 
-  if (page === 'landing') return <LandingPage onEnter={() => setPage('dashboard')} />
+  if (page === 'landing') return <LandingPage onEnter={() => setPage('transition')} />
+  if (page === 'transition') return (
+    <>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: '#030610' }} />
+      <LaunchTransition onComplete={() => setPage('dashboard')} />
+    </>
+  )
   return <Dashboard onBack={() => setPage('landing')} />
 }
