@@ -384,6 +384,11 @@ function Dashboard({ onBack }) {
 
   const [chatLayerOverrides, setChatLayerOverrides] = useState([])
 
+  // Auto-switch to mission view when pipeline starts running
+  useEffect(() => {
+    if (sim.status === 'ANALYZING') setView('mission')
+  }, [sim.status])
+
   const handleChatAction = (action) => {
     if (action.type === 'SET_VIEW' && action.payload?.view) {
       setView(action.payload.view)
