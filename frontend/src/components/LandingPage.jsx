@@ -177,8 +177,6 @@ export default function LandingPage({ onEnter }) {
   const [statsVisible, setStatsVisible] = useState(false)
   const [featuresVisible, setFeaturesVisible] = useState(false)
   const [buttonVisible, setButtonVisible] = useState(false)
-  const [exiting, setExiting] = useState(false)
-
   const tagline = useTyping('Autonomous Multi-Agent Collision Avoidance', 35, 800)
   const subtitle = useTyping('5 AI agents. Real-time negotiation. Zero human delay.', 30, 2600)
 
@@ -190,8 +188,7 @@ export default function LandingPage({ onEnter }) {
   }, [])
 
   const handleEnter = () => {
-    setExiting(true)
-    setTimeout(() => onEnter(), 800)
+    onEnter()
   }
 
   const stats = [
@@ -223,8 +220,7 @@ export default function LandingPage({ onEnter }) {
       height: '100vh',
       overflow: 'hidden',
       background: 'var(--bg-deep)',
-      opacity: exiting ? 0 : 1,
-      transition: 'opacity 0.8s ease',
+      opacity: 1,
     }}>
       {/* 3D Background */}
       <div ref={canvasRef} style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
