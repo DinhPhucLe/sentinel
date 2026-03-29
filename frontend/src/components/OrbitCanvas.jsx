@@ -488,6 +488,7 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
           s.simPhase = 'active'
           s.controls.minDistance = 0.4
           s.controls.maxDistance = 5.0
+          s.controls.zoomSpeed = 2.5
         }
       }
 
@@ -505,6 +506,7 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
           s.simPhase = null
           s.controls.minDistance = 5
           s.controls.maxDistance = 25
+          s.controls.zoomSpeed = 0.8
           s.controls.autoRotate = !s.paused
         }
       }
