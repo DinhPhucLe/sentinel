@@ -14,11 +14,13 @@ function altToRadius(alt) {
 
 // Monochromatic: all satellites are shades of cyan/white/gray
 const SAT_COLORS = {
-  GPS:      0x00C8F0,
-  STARLINK: 0x90B0C0,
-  ISS:      0xD0D8E0,
-  DEBRIS:   0x505860,
-  UNKNOWN:  0x606870,
+  GPS:       0x00C8F0,
+  STARLINK:  0x90B0C0,
+  ISS:       0xD0D8E0,
+  DEBRIS:    0x505860,
+  JAXA:      0x00B4E0,
+  ROSCOSMOS: 0xE07040,
+  UNKNOWN:   0x606870,
 }
 
 function makeOrbitLine(radius, tilt = 0, color = 0x1a2535) {
@@ -59,6 +61,58 @@ function makeConjunctionLine(posA, posB) {
   const line = new THREE.Line(geo, mat)
   line.computeLineDistances()
   return line
+}
+
+const DEBRIS_SAMPLE_SIZE = 3000
+
+async function loadDebrisCloud(scene) {
+  let objects
+  try {
+    const res = await fetch('/data/globe_debris_leo.json')
+    if (!res.ok) return
+    objects = await res.json()
+  } catch {
+    return
+  }
+
+  if (objects.length > DEBRIS_SAMPLE_SIZE) {
+    for (let i = objects.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[objects[i], objects[j]] = [objects[j], objects[i]]
+    }
+    objects = objects.slice(0, DEBRIS_SAMPLE_SIZE)
+  }
+
+  const positions = new Float32Array(objects.length * 3)
+
+  objects.forEach((obj, i) => {
+    const altKm = (obj.APOAPSIS + obj.PERIAPSIS) / 2
+    const r = EARTH_RADIUS + (altKm / 6371) * EARTH_RADIUS
+
+    const inc  = (obj.INCLINATION    * Math.PI) / 180
+    const raan = (obj.RA_OF_ASC_NODE * Math.PI) / 180
+    const anom = (obj.MEAN_ANOMALY   * Math.PI) / 180
+
+    const x_peri = r * Math.cos(anom)
+    const y_peri = r * Math.sin(anom)
+
+    positions[i * 3]     = x_peri * Math.cos(raan) - y_peri * Math.cos(inc) * Math.sin(raan)
+    positions[i * 3 + 1] = x_peri * Math.sin(raan) + y_peri * Math.cos(inc) * Math.cos(raan)
+    positions[i * 3 + 2] = y_peri * Math.sin(inc)
+  })
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+
+  const mat = new THREE.PointsMaterial({
+    color: 0x94a3b8,
+    size: 0.012,
+    opacity: 0.45,
+    transparent: true,
+    sizeAttenuation: true,
+  })
+
+  scene.add(new THREE.Points(geo, mat))
 }
 
 export default function OrbitCanvas({ satellites, events, decision, status }) {
@@ -136,6 +190,9 @@ export default function OrbitCanvas({ satellites, events, decision, status }) {
     const earth = createEarth({ radius: EARTH_RADIUS, segments: 64 })
     s.scene.add(earth.group)
     s.earthUpdate = earth.update
+
+    // Load real debris point cloud (non-blocking — gracefully skipped if unavailable)
+    loadDebrisCloud(s.scene)
 
     const onResize = () => {
       s.renderer.setSize(el.clientWidth, el.clientHeight)

@@ -28,7 +28,7 @@ export default function ControlPanel({ isRunning, connected, onTrigger, onReset 
       </button>
 
       <button className="neo-btn" onClick={() => onTrigger(true)} disabled={!canTrigger}>
-        TRIGGER KESSLER CASCADE
+        REAL CDM CASCADE
       </button>
 
       {isRunning && (
