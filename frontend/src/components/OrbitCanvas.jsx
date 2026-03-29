@@ -441,8 +441,6 @@ export default function OrbitCanvas({ satellites, events, decision, status }) {
     s.scene.add(earth.group)
     s.earthUpdate = earth.update
 
-    // Load real debris point cloud (non-blocking — gracefully skipped if unavailable)
-    loadDebrisCloud(s.scene)
 
     const onResize = () => {
       s.renderer.setSize(el.clientWidth, el.clientHeight)
