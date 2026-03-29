@@ -12,11 +12,11 @@ function getTextures() {
   if (_cache) return _cache
   const loader = new THREE.TextureLoader()
 
-  const color = loader.load('/planet-earth/tierra1.jpg')
+  const color = loader.load('/planet-earth/textures/tierra1.jpg')
   color.colorSpace = THREE.SRGBColorSpace
   color.anisotropy = 8
 
-  const clouds = loader.load('/planet-earth/2k_earth_clouds.jpg')
+  const clouds = loader.load('/planet-earth/textures/2k_earth_clouds.jpg')
   clouds.anisotropy = 4
 
   _cache = { color, clouds }

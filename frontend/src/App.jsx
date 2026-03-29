@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSimulation } from './hooks/useSimulation'
 import AgentLog from './components/AgentLog'
 import RiskPanel from './components/RiskPanel'
 import ControlPanel from './components/ControlPanel'
 import OrbitCanvas from './components/OrbitCanvas'
-import AnalyticsView from './components/LandingPage'
+import AnalyticsView from './components/AnalyticsView'
+import LandingPage from './components/LandingPage'
+import SentinelLogo, { SentinelMark } from './components/SentinelLogo'
 
 /*
   Single-page app. Sidebar switches views.
@@ -32,14 +34,16 @@ function SideIcon({ children, active, onClick, label }) {
   )
 }
 
-function Sidebar({ active, onNav }) {
+function Sidebar({ active, onNav, onBack }) {
   return (
     <div style={{
       width: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center',
       paddingTop: '14px', gap: '4px', flexShrink: 0,
       background: 'var(--bg-elevated)', borderRight: '1px solid var(--border-subtle)',
     }}>
-      <div className="sentinel-mark" style={{ marginBottom: '14px' }}>S</div>
+      <div onClick={onBack} title="Back to Landing Page" style={{ cursor: 'pointer', marginBottom: '2px' }}>
+        <SentinelMark size={34} />
+      </div>
       <SideIcon active={active === 'dashboard'} onClick={() => onNav('dashboard')} label="Dashboard">
         <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
       </SideIcon>
@@ -52,6 +56,23 @@ function Sidebar({ active, onNav }) {
       <SideIcon active={active === 'alerts'} onClick={() => onNav('alerts')} label="Alerts">
         <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
       </SideIcon>
+      <div style={{ flex: 1 }} />
+      {onBack && (
+        <button onClick={onBack} title="Back to Landing Page" style={{
+          width: '36px', height: '36px', borderRadius: 'var(--radius-sm)',
+          border: '1px solid var(--border-subtle)', background: 'var(--bg-deep)',
+          color: 'var(--text-tertiary)', cursor: 'pointer', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', marginBottom: '14px',
+          transition: 'all 0.25s var(--ease-out)',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-accent)'; e.currentTarget.style.color = 'var(--accent)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--text-tertiary)' }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }
@@ -66,7 +87,7 @@ function Header({ connected, status, clock }) {
       position: 'relative', overflow: 'hidden',
     }}>
       <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '2px', background: 'var(--accent-dim)' }} />
-      <span className="sentinel-logo" style={{ fontSize: '15px', marginLeft: '8px' }}>SENTINEL</span>
+      <div style={{ marginLeft: '8px' }}><SentinelLogo size={17} /></div>
       <div style={{ width: '1px', height: '24px', background: 'var(--border-subtle)' }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: connected ? 'var(--status-ok)' : 'var(--status-bad)', animation: 'dotPulse 2.5s ease-in-out infinite' }} />
@@ -79,43 +100,128 @@ function Header({ connected, status, clock }) {
   )
 }
 
+// ═══ Resize Handle ══════════════════════════════════════════════════
+
+function ResizeHandle({ direction, onDrag }) {
+  const dragging = useRef(false)
+
+  const onMouseDown = useCallback((e) => {
+    e.preventDefault()
+    dragging.current = true
+    document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize'
+    document.body.style.userSelect = 'none'
+
+    const onMove = (ev) => {
+      if (dragging.current) onDrag(direction === 'horizontal' ? ev.clientX : ev.clientY)
+    }
+    const onUp = () => {
+      dragging.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [direction, onDrag])
+
+  const isH = direction === 'horizontal'
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      className="resize-handle"
+      style={{
+        position: 'relative', zIndex: 10, flexShrink: 0,
+        width: isH ? '6px' : '100%',
+        height: isH ? '100%' : '6px',
+        cursor: isH ? 'col-resize' : 'row-resize',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <div style={{
+        width: isH ? '2px' : '32px',
+        height: isH ? '32px' : '2px',
+        borderRadius: '2px',
+        background: 'var(--border-subtle)',
+        transition: 'background 0.2s',
+      }} />
+    </div>
+  )
+}
+
 // ═══ Mission Control View ════════════════════════════════════════════
 
 function MissionView({ sim }) {
+  const containerRef = useRef(null)
+  const [rightW, setRightW] = useState(300)
+  const [bottomH, setBottomH] = useState(220)
+
+  const onDragCol = useCallback((x) => {
+    const el = containerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const newRight = Math.max(200, Math.min(500, rect.right - x - 12))
+    setRightW(newRight)
+  }, [])
+
+  const onDragRow = useCallback((y) => {
+    const el = containerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const newBottom = Math.max(120, Math.min(rect.height * 0.6, rect.bottom - y - 12))
+    setBottomH(newBottom)
+  }, [])
+
   return (
-    <div className="scan-line" style={{
-      display: 'grid', gridTemplateColumns: '1fr 300px', gridTemplateRows: '1fr 240px',
-      gap: 'var(--space-md)', flex: 1, minHeight: 0, position: 'relative',
+    <div ref={containerRef} style={{
+      display: 'flex', flexDirection: 'column',
+      flex: 1, minHeight: 0, overflow: 'hidden',
     }}>
-      <div className="neo-panel grid-bg" style={{ overflow: 'hidden', position: 'relative' }}>
-        <OrbitCanvas satellites={sim.satellites} events={sim.events} decision={sim.decision} status={sim.status} />
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', overflowY: 'auto' }}>
-        <RiskPanel status={sim.status} events={sim.events} decision={sim.decision} />
-        <ControlPanel isRunning={sim.isRunning} connected={sim.connected} onTrigger={sim.triggerScenario} onReset={sim.reset} />
-      </div>
-      <AgentLog messages={sim.agentMessages} />
-      <div className="neo-panel" style={{ padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ fontSize: '10px', letterSpacing: '0.14em', color: 'var(--text-secondary)', fontWeight: '600', fontFamily: 'var(--font-display)', paddingBottom: '8px', marginBottom: '8px', borderBottom: '1px solid var(--border-subtle)' }}>
-          SATELLITE ROSTER <span style={{ float: 'right', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-tertiary)' }}>{sim.satellites.length}</span>
+      {/* Top row: orbit canvas + right sidebar */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        {/* Orbit canvas */}
+        <div className="neo-panel grid-bg" style={{ flex: 1, minWidth: 0, overflow: 'hidden', position: 'relative' }}>
+          <OrbitCanvas satellites={sim.satellites} events={sim.events} decision={sim.decision} status={sim.status} />
         </div>
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {sim.satellites.map((sat, i) => {
-            const f = (sat.fuel_remaining * 100).toFixed(0)
-            return (
-              <div key={sat.id} className="neo-inset" style={{ padding: '8px 10px', marginBottom: '6px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '3px' }}>
-                  <span style={{ color: 'var(--text-heading)', fontFamily: 'var(--font-display)', fontWeight: '600' }}>{sat.name}</span>
-                  <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{sat.controllable ? 'CTRL' : 'INERT'}</span>
+
+        <ResizeHandle direction="horizontal" onDrag={onDragCol} />
+
+        {/* Right sidebar */}
+        <div style={{ width: rightW, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-md)', overflowY: 'auto', overflowX: 'hidden' }}>
+          <RiskPanel status={sim.status} events={sim.events} decision={sim.decision} />
+          <ControlPanel isRunning={sim.isRunning} connected={sim.connected} onTrigger={sim.triggerScenario} onReset={sim.reset} />
+        </div>
+      </div>
+
+      <ResizeHandle direction="vertical" onDrag={onDragRow} />
+
+      {/* Bottom row: agent log + satellite roster */}
+      <div style={{ height: bottomH, flexShrink: 0, display: 'flex', gap: 'var(--space-md)', minHeight: 0 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <AgentLog messages={sim.agentMessages} />
+        </div>
+        <div className="neo-panel" style={{ width: rightW, flexShrink: 0, padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ fontSize: '10px', letterSpacing: '0.14em', color: 'var(--text-secondary)', fontWeight: '600', fontFamily: 'var(--font-display)', paddingBottom: '8px', marginBottom: '8px', borderBottom: '1px solid var(--border-subtle)' }}>
+            SATELLITE ROSTER <span style={{ float: 'right', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-tertiary)' }}>{sim.satellites.length}</span>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {sim.satellites.map((sat, i) => {
+              const f = (sat.fuel_remaining * 100).toFixed(0)
+              return (
+                <div key={sat.id} className="neo-inset" style={{ padding: '8px 10px', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '3px' }}>
+                    <span style={{ color: 'var(--text-heading)', fontFamily: 'var(--font-display)', fontWeight: '600' }}>{sat.name}</span>
+                    <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{sat.controllable ? 'CTRL' : 'INERT'}</span>
+                  </div>
+                  <div style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'flex', gap: '6px' }}><span>{sat.id}</span><span>P{sat.priority}</span></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                    <div style={{ flex: 1, height: '2px', background: 'var(--bg-surface)', borderRadius: '1px', overflow: 'hidden' }}><div style={{ width: `${f}%`, height: '100%', background: 'var(--accent-dim)', borderRadius: '1px' }} /></div>
+                    <span>{f}%</span>
+                  </div>
                 </div>
-                <div style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'flex', gap: '6px' }}><span>{sat.id}</span><span>P{sat.priority}</span></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                  <div style={{ flex: 1, height: '2px', background: 'var(--bg-surface)', borderRadius: '1px', overflow: 'hidden' }}><div style={{ width: `${f}%`, height: '100%', background: 'var(--accent-dim)', borderRadius: '1px' }} /></div>
-                  <span>{f}%</span>
-                </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -191,25 +297,69 @@ function useLiveClock() {
   return t.toLocaleTimeString('en-US', { hour12: false, timeZone: 'UTC' }) + ' UTC'
 }
 
-// ═══ Root ════════════════════════════════════════════════════════════
+// ═══ Dashboard (sidebar app) ═════════════════════════════════════════
 
-export default function App() {
+function Dashboard({ onBack }) {
   const sim = useSimulation()
   const [view, setView] = useState('dashboard')
   const clock = useLiveClock()
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: 'var(--bg-deep)', overflow: 'hidden' }}>
-      <Sidebar active={view} onNav={setView} />
+      <Sidebar active={view} onNav={setView} onBack={onBack} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Header connected={sim.connected} status={sim.status} clock={clock} />
-        <main style={{ flex: 1, overflow: 'auto', padding: 'var(--space-md)', minHeight: 0 }}>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 'var(--space-md)', minHeight: 0, overflow: view === 'mission' ? 'hidden' : 'auto' }}>
           {view === 'dashboard' && <AnalyticsView sim={sim} />}
           {view === 'mission' && <MissionView sim={sim} />}
           {view === 'satellites' && <SatellitesView satellites={sim.satellites} />}
           {view === 'alerts' && <AlertsView />}
         </main>
       </div>
+    </div>
+  )
+}
+
+// ═══ Root — Landing Page → Dashboard with smooth transition ═════════
+
+export default function App() {
+  const [page, setPage] = useState('landing')
+  const [transitioning, setTransitioning] = useState(false)
+
+  const handleLaunch = useCallback(() => {
+    setTransitioning(true)
+    setTimeout(() => { setPage('dashboard'); setTransitioning(false) }, 900)
+  }, [])
+
+  const handleBack = useCallback(() => {
+    setTransitioning(true)
+    setTimeout(() => { setPage('landing'); setTransitioning(false) }, 600)
+  }, [])
+
+  return (
+    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: 'var(--bg-deep)' }}>
+      {/* Transition overlay */}
+      {transitioning && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100, pointerEvents: 'none',
+          background: 'var(--bg-deep)',
+          animation: page === 'landing'
+            ? 'fadeOverlayIn 0.5s ease forwards, fadeOverlayOut 0.5s ease 0.5s forwards'
+            : 'fadeOverlayIn 0.4s ease forwards, fadeOverlayOut 0.5s ease 0.5s forwards',
+        }} />
+      )}
+
+      {page === 'landing' && (
+        <div style={{ position: 'absolute', inset: 0, animation: transitioning ? 'pageExitWarp 0.8s ease-in both' : 'pageEnterFade 0.6s var(--ease-out) both' }}>
+          <LandingPage onEnter={handleLaunch} />
+        </div>
+      )}
+
+      {page === 'dashboard' && (
+        <div style={{ position: 'absolute', inset: 0, animation: transitioning ? 'pageExitZoom 0.6s ease-in both' : 'pageEnterZoom 0.6s var(--ease-out) both' }}>
+          <Dashboard onBack={handleBack} />
+        </div>
+      )}
     </div>
   )
 }

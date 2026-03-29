@@ -441,6 +441,13 @@ body {
 }
 
 
+/* ── Resize Handle ────────────────────────────────────── */
+.resize-handle:hover > div {
+  background: var(--accent-dim) !important;
+  box-shadow: 0 0 6px rgba(94, 170, 187, 0.3);
+}
+
+
 /* ── Grid Background ──────────────────────────────────── */
 .grid-bg { position: relative; }
 .grid-bg::before {
