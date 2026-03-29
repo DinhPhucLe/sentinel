@@ -1,123 +1,86 @@
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
-const WELCOME = "I'm **Sentinel AI**, your orbital traffic assistant.\n\nAsk me about *satellites*, *collision risks*, or *orbital zones* — or try commands like __\"show me alerts\"__ or __\"hide critical conjunctions\"__."
+const WELCOME = "I'm **Sentinel AI**, your orbital traffic assistant.\n\nAsk me about *satellites*, *collision risks*, or *orbital zones* — or try commands like **\"show me alerts\"** or **\"hide critical conjunctions\"**."
+const BOT_IMAGE_CANDIDATES = ['/chatbot-logo.png', '/chatbot_logo.png', '/chatbot_log.png']
 
-// ── Markdown inline renderer ──────────────────────────────────────────
-function renderInline(text, keyPrefix = '') {
-  const parts = []
-  const regex = /\*\*(.+?)\*\*|\*(.+?)\*|__(.+?)__|`(.+?)`/g
-  let last = 0, match, i = 0
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > last) parts.push(text.slice(last, match.index))
-    if (match[1] !== undefined)
-      parts.push(<strong key={keyPrefix + i} style={{ color: 'var(--text-heading)', fontWeight: 700 }}>{match[1]}</strong>)
-    else if (match[2] !== undefined)
-      parts.push(<em key={keyPrefix + i} style={{ color: 'var(--accent)', fontStyle: 'italic' }}>{match[2]}</em>)
-    else if (match[3] !== undefined)
-      parts.push(<u key={keyPrefix + i} style={{ textDecorationColor: 'var(--accent-dim)' }}>{match[3]}</u>)
-    else if (match[4] !== undefined)
-      parts.push(
-        <code key={keyPrefix + i} style={{
-          background: 'var(--bg-deep)', padding: '1px 5px',
-          borderRadius: '3px', fontFamily: 'var(--font-mono)',
-          fontSize: '10px', color: 'var(--accent)',
-        }}>{match[4]}</code>
-      )
-    last = match.index + match[0].length
-    i++
-  }
-  if (last < text.length) parts.push(text.slice(last))
-  return parts
-}
-
-function renderMarkdown(text) {
-  if (!text) return null
-  const lines = text.split('\n')
-  const elements = []
-  let listItems = []
-  let numberedItems = []
-  let key = 0
-
-  const flushList = () => {
-    if (listItems.length) {
-      elements.push(
-        <ul key={key++} style={{ margin: '5px 0', paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          {listItems.map((item, idx) => (
-            <li key={idx} style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.55 }}>
-              {renderInline(item, `ul${key}${idx}`)}
-            </li>
-          ))}
-        </ul>
-      )
-      listItems = []
-    }
-    if (numberedItems.length) {
-      elements.push(
-        <ol key={key++} style={{ margin: '5px 0', paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          {numberedItems.map((item, idx) => (
-            <li key={idx} style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.55 }}>
-              {renderInline(item, `ol${key}${idx}`)}
-            </li>
-          ))}
-        </ol>
-      )
-      numberedItems = []
-    }
-  }
-
-  for (const line of lines) {
-    if (!line.trim()) {
-      flushList()
-      elements.push(<div key={key++} style={{ height: '5px' }} />)
-      continue
-    }
-
-    const h1 = line.match(/^#\s+(.+)/)
-    const h2 = line.match(/^##\s+(.+)/)
-    const h3 = line.match(/^###\s+(.+)/)
-    if (h3) {
-      flushList()
-      elements.push(<div key={key++} style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-display)', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: '6px' }}>{renderInline(h3[1], `h3${key}`)}</div>)
-      continue
-    }
-    if (h2) {
-      flushList()
-      elements.push(<div key={key++} style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--font-display)', marginTop: '8px', marginBottom: '2px' }}>{renderInline(h2[1], `h2${key}`)}</div>)
-      continue
-    }
-    if (h1) {
-      flushList()
-      elements.push(<div key={key++} style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)', fontFamily: 'var(--font-display)', marginTop: '8px', marginBottom: '4px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '4px' }}>{renderInline(h1[1], `h1${key}`)}</div>)
-      continue
-    }
-
-    const bullet = line.match(/^[-•*]\s+(.+)/)
-    if (bullet) { listItems.push(bullet[1]); continue }
-
-    const numbered = line.match(/^\d+\.\s+(.+)/)
-    if (numbered) { numberedItems.push(numbered[1]); continue }
-
-    // Horizontal rule
-    if (/^---+$/.test(line.trim())) {
-      flushList()
-      elements.push(<hr key={key++} style={{ border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '6px 0' }} />)
-      continue
-    }
-
-    flushList()
-    elements.push(
-      <div key={key++} style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.6, marginBottom: '1px' }}>
-        {renderInline(line, `p${key}`)}
-      </div>
-    )
-  }
-  flushList()
-  return elements
+// ── Themed markdown components ────────────────────────────────────────
+const MD_COMPONENTS = {
+  p: ({ children }) => (
+    <p style={{ margin: '0 0 6px', fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.6 }}>{children}</p>
+  ),
+  strong: ({ children }) => (
+    <strong style={{ color: 'var(--text-heading)', fontWeight: 700 }}>{children}</strong>
+  ),
+  em: ({ children }) => (
+    <em style={{ color: 'var(--accent)', fontStyle: 'italic' }}>{children}</em>
+  ),
+  h1: ({ children }) => (
+    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)', fontFamily: 'var(--font-display)', margin: '10px 0 4px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '4px' }}>{children}</div>
+  ),
+  h2: ({ children }) => (
+    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--font-display)', margin: '8px 0 3px' }}>{children}</div>
+  ),
+  h3: ({ children }) => (
+    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-display)', letterSpacing: '0.08em', textTransform: 'uppercase', margin: '6px 0 2px' }}>{children}</div>
+  ),
+  ul: ({ children }) => (
+    <ul style={{ margin: '4px 0 6px', paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '2px' }}>{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol style={{ margin: '4px 0 6px', paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '2px' }}>{children}</ol>
+  ),
+  li: ({ children }) => (
+    <li style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.55 }}>{children}</li>
+  ),
+  code: ({ inline, children }) => inline
+    ? <code style={{ background: 'var(--bg-deep)', padding: '1px 5px', borderRadius: '3px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--accent)' }}>{children}</code>
+    : <pre style={{ background: 'var(--bg-deep)', padding: '8px 10px', borderRadius: '6px', margin: '6px 0', overflowX: 'auto', border: '1px solid var(--border-subtle)' }}><code style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--accent-dim)' }}>{children}</code></pre>,
+  hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '8px 0' }} />,
+  // ── Table rendered as a proper UI card ───────────────────────────────
+  table: ({ children }) => (
+    <div style={{ margin: '8px 0', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(94,170,187,0.2)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => (
+    <thead style={{ background: 'rgba(94,170,187,0.08)' }}>{children}</thead>
+  ),
+  tbody: ({ children }) => <tbody>{children}</tbody>,
+  tr: ({ children }) => (
+    <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>{children}</tr>
+  ),
+  th: ({ children }) => (
+    <th style={{ padding: '6px 10px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent)', letterSpacing: '0.06em', fontSize: '10px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{children}</th>
+  ),
+  td: ({ children }) => (
+    <td style={{ padding: '6px 10px', color: 'var(--text-primary)', verticalAlign: 'top', lineHeight: 1.45 }}>{children}</td>
+  ),
+  blockquote: ({ children }) => (
+    <blockquote style={{ margin: '6px 0', paddingLeft: '10px', borderLeft: '2px solid var(--accent-dim)', color: 'var(--text-secondary)', fontStyle: 'italic' }}>{children}</blockquote>
+  ),
 }
 
 // ── Typing animation config ───────────────────────────────────────────
 const TYPING_SPEED = 10  // chars per tick
 const TYPING_INTERVAL = 18 // ms
+const LOADING_PHASES = ['Thinking', 'Analyzing', 'Drafting response']
+
+function BotAvatar({ style = {}, alt = 'Sentinel' }) {
+  const [imgSrc, setImgSrc] = useState(BOT_IMAGE_CANDIDATES[0])
+  const [idx, setIdx] = useState(0)
+
+  const handleError = () => {
+    const next = idx + 1
+    if (next < BOT_IMAGE_CANDIDATES.length) {
+      setIdx(next)
+      setImgSrc(BOT_IMAGE_CANDIDATES[next])
+    }
+  }
+
+  return <img src={imgSrc} onError={handleError} alt={alt} style={style} />
+}
 
 // ── Component ─────────────────────────────────────────────────────────
 export default function ChatBot({ satellites = [], events = [], status = 'MONITORING', view = 'mission', onAction, agentMessages = [] }) {
@@ -128,6 +91,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
   const [unread, setUnread] = useState(0)
   const [typingIndex, setTypingIndex] = useState(null)
   const [typingText, setTypingText] = useState('')
+  const [loadingPhaseIndex, setLoadingPhaseIndex] = useState(0)
   const prevStatusRef = useRef(status)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
@@ -179,6 +143,18 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
       setUnread(u => u + 1)
     }
   }, [status, open])
+
+  // Thinking/analyzing phase text while waiting on backend
+  useEffect(() => {
+    if (!loading) {
+      setLoadingPhaseIndex(0)
+      return
+    }
+    const id = setInterval(() => {
+      setLoadingPhaseIndex(prev => (prev + 1) % LOADING_PHASES.length)
+    }, 900)
+    return () => clearInterval(id)
+  }, [loading])
 
   // Ctrl+/ keyboard shortcut
   useEffect(() => {
@@ -243,8 +219,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
             background: 'linear-gradient(135deg, var(--bg-deep) 0%, #0a1520 100%)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <img
-                src="/chatbot-logo.png"
+              <BotAvatar
                 alt="Sentinel"
                 style={{ width: '34px', height: '34px', borderRadius: '8px', objectFit: 'cover', border: '1px solid rgba(94,170,187,0.2)' }}
               />
@@ -285,7 +260,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
             {messages.map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '7px' }}>
                 {m.role === 'assistant' && (
-                  <img src="/chatbot-logo.png" alt="" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginBottom: '2px', border: '1px solid rgba(94,170,187,0.15)' }} />
+                  <BotAvatar alt="" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginBottom: '2px', border: '1px solid rgba(94,170,187,0.15)' }} />
                 )}
                 <div style={{
                   maxWidth: '82%',
@@ -297,8 +272,10 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
                   {m.role === 'user'
                     ? <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.55 }}>{m.content}</div>
                     : (
-                      <>
-                        {renderMarkdown(displayContent(m, i))}
+                      <div style={{ minWidth: 0 }}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
+                          {displayContent(m, i)}
+                        </ReactMarkdown>
                         {i === typingIndex && (
                           <span style={{
                             display: 'inline-block', width: '2px', height: '13px',
@@ -307,7 +284,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
                             verticalAlign: 'middle', borderRadius: '1px',
                           }} />
                         )}
-                      </>
+                      </div>
                     )
                   }
                 </div>
@@ -317,15 +294,32 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
             {/* Animated loading dots */}
             {loading && (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '7px' }}>
-                <img src="/chatbot-logo.png" alt="" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(94,170,187,0.15)' }} />
-                <div style={{ padding: '11px 16px', borderRadius: '3px 14px 14px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', display: 'flex', gap: '5px', alignItems: 'center' }}>
-                  {[0, 1, 2].map(i => (
-                    <div key={i} style={{
-                      width: '6px', height: '6px', borderRadius: '50%',
-                      background: 'var(--accent-dim)',
-                      animation: `dotPulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+                <BotAvatar alt="" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(94,170,187,0.15)' }} />
+                <div style={{ padding: '10px 13px', borderRadius: '3px 14px 14px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', minWidth: '180px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
+                    <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                      {LOADING_PHASES[loadingPhaseIndex]}
+                    </span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>AI</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '5px', alignItems: 'center', marginBottom: '8px' }}>
+                    {[0, 1, 2].map(i => (
+                      <div key={i} style={{
+                        width: '6px', height: '6px', borderRadius: '50%',
+                        background: 'var(--accent-dim)',
+                        animation: `dotPulse 1.2s ease-in-out ${i * 0.18}s infinite`,
+                      }} />
+                    ))}
+                  </div>
+                  <div style={{ height: '3px', borderRadius: '999px', overflow: 'hidden', background: 'rgba(94,170,187,0.08)' }}>
+                    <div style={{
+                      width: '42%',
+                      height: '100%',
+                      borderRadius: '999px',
+                      background: 'linear-gradient(90deg, rgba(94,170,187,0.2) 0%, rgba(94,170,187,0.75) 50%, rgba(94,170,187,0.2) 100%)',
+                      animation: 'slideIn 0.9s var(--ease-out) infinite alternate',
                     }} />
-                  ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -392,7 +386,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
                 fontSize: '11px', fontWeight: 600, cursor: loading || !input.trim() ? 'default' : 'pointer',
                 fontFamily: 'var(--font-display)', letterSpacing: '0.06em', transition: 'all 0.15s',
               }}
-            >SEND</button>
+            >{loading ? 'WAIT' : 'SEND'}</button>
           </div>
         </div>
       )}
@@ -431,7 +425,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
                 </svg>
               </div>
             )
-            : <img src="/chatbot-logo.png" alt="Sentinel AI" style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover' }} />
+            : <BotAvatar alt="Sentinel AI" style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover' }} />
           }
         </button>
       </div>
