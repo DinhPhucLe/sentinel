@@ -92,10 +92,12 @@ app = FastAPI(title="Orbital Traffic Control API", version="1.0.0")
 
 @app.on_event("startup")
 async def startup_log():
-    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    groq_key = os.environ.get("GROQ_API_KEY", "")
     logger.info("=" * 50)
     logger.info("SENTINEL backend starting")
-    logger.info(f"ANTHROPIC_API_KEY: {'SET (' + key[:12] + '...)' if key else 'NOT SET'}")
+    logger.info(f"ANTHROPIC_API_KEY: {'SET' if anthropic_key else 'NOT SET'}")
+    logger.info(f"GROQ_API_KEY: {'SET' if groq_key else 'NOT SET'}")
     from config import AGENT_MODEL
     logger.info(f"Agent model: {AGENT_MODEL}")
     logger.info("=" * 50)
@@ -127,6 +129,23 @@ if _DATA_DIR.exists():
 async def get_satellites():
     from tools.real_data_loader import get_real_satellites
     return get_real_satellites()
+
+
+@app.get("/api/conjunctions")
+async def get_conjunctions():
+    from tools.real_data_loader import get_real_kessler_events
+    events = get_real_kessler_events(top_n=200)
+    return {"conjunctions": events, "total": len(events)}
+
+
+@app.get("/api/stats")
+async def get_stats():
+    import json
+    stats_path = _DATA_DIR / "stats.json"
+    if not stats_path.exists():
+        return {"error": "stats.json not found"}
+    with open(stats_path) as f:
+        return json.load(f)
 
 
 @app.get("/api/events")
@@ -217,7 +236,25 @@ async def chat(body: dict):
     from fastapi import HTTPException
     from litellm import acompletion
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    def provider_from_model(model_name: str) -> str:
+        if model_name.startswith("groq/"):
+            return "groq"
+        if model_name.startswith("anthropic/"):
+            return "anthropic"
+        if model_name.startswith("gemini") or model_name.startswith("google/"):
+            return "google"
+        return "other"
+
+    chat_model = (
+        os.environ.get("CHAT_MODEL")
+        or os.environ.get("AGENT_MODEL")
+        or ("groq/llama-3.3-70b-versatile" if os.environ.get("GROQ_API_KEY") else "anthropic/claude-sonnet-4-6")
+    )
+    provider = provider_from_model(chat_model)
+
+    if provider == "groq" and not os.environ.get("GROQ_API_KEY"):
+        raise HTTPException(status_code=503, detail="GROQ_API_KEY not configured")
+    if provider == "anthropic" and not os.environ.get("ANTHROPIC_API_KEY"):
         raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
 
     message = (body.get("message") or "").strip()
@@ -315,14 +352,18 @@ Only emit an action when the user explicitly asks to navigate or toggle a layer.
     t0 = time.time()
     try:
         response = await acompletion(
-            model="anthropic/claude-sonnet-4-6",
+            model=chat_model,
             messages=messages,
             max_tokens=600,
             temperature=0.3,
         )
     except Exception as e:
         logger.error(f"Chat LLM error: {e}")
-        raise HTTPException(status_code=502, detail="AI service unavailable — check ANTHROPIC_API_KEY")
+        if provider == "groq":
+            raise HTTPException(status_code=502, detail="AI service unavailable — check GROQ_API_KEY")
+        if provider == "anthropic":
+            raise HTTPException(status_code=502, detail="AI service unavailable — check ANTHROPIC_API_KEY")
+        raise HTTPException(status_code=502, detail="AI service unavailable — check model/provider credentials")
 
     elapsed_ms = round((time.time() - t0) * 1000)
     text = response.choices[0].message.content or ""
