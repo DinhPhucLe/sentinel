@@ -32,7 +32,7 @@ def _logout(session: requests.Session):
         pass
 
 
-def download_all(output_dir: str = RAW_DIR) -> dict:
+def download_all(output_dir: str = RAW_DIR, selected_files: list[str] | None = None) -> dict:
     """
     Download every query defined in config.QUERIES as CSV.
     Saves files to output_dir.
@@ -48,7 +48,12 @@ def download_all(output_dir: str = RAW_DIR) -> dict:
     if not _login(session):
         return {}
 
-    for filename, query_path in QUERIES.items():
+    query_items = QUERIES.items()
+    if selected_files:
+        wanted = set(selected_files)
+        query_items = [(name, path) for name, path in QUERIES.items() if name in wanted]
+
+    for filename, query_path in query_items:
         url = BASE_URL + query_path
         filepath = os.path.join(output_dir, filename)
         print(f"Fetching  {filename} ...", end=" ", flush=True)

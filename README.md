@@ -52,6 +52,7 @@ SPACETRACK_PASSWORD=your_password
 | `python etl_pipeline.py --download` | Download raw CSVs only |
 | `python etl_pipeline.py --process` | Process existing raw CSVs (no network call) |
 | `python etl_pipeline.py --verify` | Show row counts of all downloaded files |
+| `python scheduler.py --run-now` | Start recurring scheduler and run all groups immediately |
 
 ### Typical first run
 
@@ -65,6 +66,23 @@ This will:
 3. Merge and clean the data
 4. Export JSON files into `data/processed/`
 5. Write summary statistics to `data/analysis/stats.json`
+
+### Run recurring updates (safe "real-time" polling)
+
+```bash
+python scheduler.py --run-now
+```
+
+The scheduler applies rate-limit-safe polling groups:
+
+- Hourly: orbital + decay + TIP (`debris_orbital.csv`, `payload_orbital.csv`, `rocket_orbital.csv`, `decay_predictions.csv`, `tip_messages.csv`)
+- Every 8 hours: conjunctions (`conjunctions.csv`)
+- Daily: catalog + boxscore (`satcat_all.csv`, `boxscore.csv`)
+
+Useful flags:
+
+- `--once`: run one scheduling check then exit
+- `--poll-seconds 60`: check due jobs every 60 seconds (default)
 
 ---
 
