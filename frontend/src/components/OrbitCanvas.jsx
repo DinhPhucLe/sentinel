@@ -497,6 +497,70 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
     s.scene.add(earth.group)
     s.earthUpdate = earth.update
 
+    // ── Debris cloud — fetch real LEO debris and render as particle cloud ──
+    const EARTH_RADIUS_KM = 6371.0
+    const SCALE = EARTH_RADIUS / EARTH_RADIUS_KM  // scene units per km
+
+    function orbitalElementsToECI(apoapsis, periapsis, inc, raan, argPeri, meanAnom) {
+      // Semi-major axis (km)
+      const a = (apoapsis + periapsis) / 2 + EARTH_RADIUS_KM
+      // Inclination, RAAN, arg of pericenter, mean anomaly — all in radians
+      const incR = inc * Math.PI / 180
+      const raanR = raan * Math.PI / 180
+      const argR = argPeri * Math.PI / 180
+      const mR = meanAnom * Math.PI / 180
+      // Eccentric anomaly via Newton's method (assume near-circular)
+      const e = (apoapsis - periapsis) / (2 * a) // eccentricity
+      let E = mR
+      for (let i = 0; i < 5; i++) E = mR + e * Math.sin(E)
+      // True anomaly
+      const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2))
+      // Distance
+      const r = a * (1 - e * Math.cos(E))
+      // Position in orbital plane
+      const xOrb = r * Math.cos(nu)
+      const yOrb = r * Math.sin(nu)
+      // Rotation matrices — ECI
+      const cosO = Math.cos(raanR), sinO = Math.sin(raanR)
+      const cosI = Math.cos(incR),  sinI = Math.sin(incR)
+      const cosW = Math.cos(argR),  sinW = Math.sin(argR)
+      const x = (cosO * cosW - sinO * sinW * cosI) * xOrb + (-cosO * sinW - sinO * cosW * cosI) * yOrb
+      const y = (sinO * cosW + cosO * sinW * cosI) * xOrb + (-sinO * sinW + cosO * cosW * cosI) * yOrb
+      const z = (sinW * sinI) * xOrb + (cosW * sinI) * yOrb
+      return [x * SCALE, y * SCALE, z * SCALE]
+    }
+
+    fetch('/data/globe_debris_leo.json')
+      .then(r => r.json())
+      .then(data => {
+        if (!Array.isArray(data) || !s.scene) return
+        const positions = new Float32Array(data.length * 3)
+        let count = 0
+        data.forEach(obj => {
+          const ap = parseFloat(obj.APOAPSIS)
+          const pe = parseFloat(obj.PERIAPSIS)
+          const inc = parseFloat(obj.INCLINATION)
+          const raan = parseFloat(obj.RA_OF_ASC_NODE)
+          const argPeri = parseFloat(obj.ARG_OF_PERICENTER)
+          const meanAnom = parseFloat(obj.MEAN_ANOMALY)
+          if (isNaN(ap) || isNaN(pe) || isNaN(inc)) return
+          const [x, y, z] = orbitalElementsToECI(ap, pe, inc, raan, argPeri, meanAnom)
+          positions[count * 3]     = x
+          positions[count * 3 + 1] = y
+          positions[count * 3 + 2] = z
+          count++
+        })
+        const geo = new THREE.BufferGeometry()
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions.slice(0, count * 3), 3))
+        const mat = new THREE.PointsMaterial({
+          color: 0x8899aa, size: 0.025, sizeAttenuation: true,
+          transparent: true, opacity: 0.45, depthWrite: false,
+        })
+        const cloud = new THREE.Points(geo, mat)
+        s.debrisCloud = cloud
+        s.scene.add(cloud)
+      })
+      .catch(() => {})
 
     const onResize = () => {
       s.renderer.setSize(el.clientWidth, el.clientHeight)
