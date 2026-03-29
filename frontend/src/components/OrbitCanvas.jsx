@@ -607,8 +607,10 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
       }
 
       if (s.simPhase === 'exiting') {
-        s.simLerpT = Math.min(s.simLerpT + 0.012, 1)
-        const ease = 1 - Math.pow(1 - s.simLerpT, 3)
+        s.simLerpT = Math.min(s.simLerpT + 0.007, 1)
+        const t = s.simLerpT
+        // Cubic ease-in-out: slow start → accelerate → slow finish (cinematic zoom-out)
+        const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
         s.camera.position.lerpVectors(s.simExitCamStart, new THREE.Vector3(0, 7, 14), ease)
         s.controls.target.lerpVectors(s.simExitTargetStart, new THREE.Vector3(0, 0, 0), ease)
         if (s.simLerpT >= 1) {
