@@ -105,41 +105,6 @@ function makeArrow() {
   )
 }
 
-// ── Kessler helpers ───────────────────────────────────────────────────
-
-function makeCollisionFlash(pos, color = 0xffffff) {
-  const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.05, 8, 8),
-    new THREE.MeshBasicMaterial({ color, opacity: 1, transparent: true }),
-  )
-  mesh.position.copy(pos)
-  return mesh
-}
-
-// Debris field: a cloud of particles that travels along an orbital path
-function makeDebrisField({ radius, tilt, startAngle, count, color = 0xff6600 }) {
-  const positions = new Float32Array(count * 3)
-  const angles = new Float32Array(count)
-  const radii = new Float32Array(count)
-
-  for (let i = 0; i < count; i++) {
-    // Spread debris across ~120° arc starting at collision point
-    angles[i] = startAngle + (Math.random() - 0.5) * 2.1
-    radii[i] = radius + (Math.random() - 0.5) * 0.12
-    const a = angles[i], r = radii[i]
-    positions[i * 3]     = Math.cos(a) * r
-    positions[i * 3 + 1] = Math.sin(a) * r * Math.sin(tilt)
-    positions[i * 3 + 2] = Math.sin(a) * r * Math.cos(tilt)
-  }
-
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  const mat = new THREE.PointsMaterial({ color, size: 0.05, transparent: true, opacity: 0.8, sizeAttenuation: true })
-  const points = new THREE.Points(geo, mat)
-
-  return { points, angles, radii, tilt, count, baseSpeed: 0.28, age: 0 }
-}
-
 // ── HUD sub-components ────────────────────────────────────────────────
 
 const PANEL_STYLE = {
@@ -346,7 +311,16 @@ function SatDetailPopup({ sat, events, onClose }) {
 
 // ── Main component ────────────────────────────────────────────────────
 
-export default function OrbitCanvas({ satellites, events, decision, status, simMode, kesslerMode, onEndSim }) {
+const AGENT_META_CANVAS = {
+  tracking_agent:     { color: '#5eaabb', label: 'TRK' },
+  prediction_agent:   { color: '#a78bfa', label: 'PRED' },
+  optimization_agent: { color: '#fbbf24', label: 'OPT' },
+  negotiation_agent:  { color: '#fb923c', label: 'NEG' },
+  governance_agent:   { color: '#34d399', label: 'GOV' },
+  system:             { color: '#f87171', label: 'SYS' },
+}
+
+export default function OrbitCanvas({ satellites, events, decision, status, simMode, agentMessages, onEndSim }) {
   const mountRef = useRef(null)
   const stateRef = useRef({
     renderer: null, scene: null, camera: null, animId: null, controls: null,
@@ -360,9 +334,6 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
     simTrackingRing: null, simPartnerOrbitLine: null, simPOVOrbitLine: null,
     simRedLine: null, simGreenArc: null, simArrows: [],
     simRingAngle: 0,
-    // Kessler
-    debrisFields: [],
-    kesslerFlashes: [],
   })
 
   const [paused, setPaused] = useState(false)
@@ -578,34 +549,6 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
           s.simArrows.forEach(c => { c.visible = false })
         }
       }
-
-      // ── Kessler: debris fields orbit along real paths ─────────────
-      s.debrisFields.forEach(field => {
-        field.age += 0.016
-        const pos = field.points.geometry.attributes.position.array
-        for (let i = 0; i < field.count; i++) {
-          // Each particle orbits slightly faster/slower — spreads the cloud
-          const speedVariation = 1 + (i % 7 - 3) * 0.04
-          field.angles[i] += field.baseSpeed * 0.004 * s.simSpeed * speedVariation
-          const a = field.angles[i], r = field.radii[i]
-          pos[i * 3]     = Math.cos(a) * r
-          pos[i * 3 + 1] = Math.sin(a) * r * Math.sin(field.tilt)
-          pos[i * 3 + 2] = Math.sin(a) * r * Math.cos(field.tilt)
-        }
-        field.points.geometry.attributes.position.needsUpdate = true
-        // Fade out over 30 seconds
-        field.points.material.opacity = Math.max(0, 0.8 - field.age * 0.025)
-      })
-
-      // ── Kessler: collision flashes ────────────────────────────────
-      s.kesslerFlashes = s.kesslerFlashes.filter(fx => {
-        fx.age += 0.016
-        const prog = fx.age / fx.duration
-        fx.mesh.scale.setScalar(1 + prog * 5)
-        fx.mesh.material.opacity = Math.max(0, 1 - prog * 1.8)
-        if (prog >= 1) { s.scene.remove(fx.mesh); return false }
-        return true
-      })
 
       s.controls.update()
       s.renderer.render(s.scene, s.camera)
@@ -824,98 +767,6 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
     setFocusSatId(newFocus)
   }, [simMode, satellites])
 
-  // ── Kessler cascade visual ─────────────────────────────────────────
-  useEffect(() => {
-    const s = stateRef.current
-    if (!kesslerMode || !s.scene) return
-
-    // Clean up any prior Kessler effects
-    s.debrisFields.forEach(f => s.scene.remove(f.points))
-    s.kesslerFlashes.forEach(f => s.scene.remove(f.mesh))
-    s.debrisFields = []
-    s.kesslerFlashes = []
-
-    // Restore orbit line colors that may have been contaminated
-    Object.entries(s.orbitLines).forEach(([, l]) => {
-      if (l?.material?.color) l.material.color.set(0x1a2535)
-    })
-
-    // ── Helper: spawn a collision flash at a real satellite position ──
-    const flash = (satId, color, delay) => {
-      setTimeout(() => {
-        if (!s.scene) return
-        const obj = s.sats[satId]
-        if (!obj) return
-        const fx = makeCollisionFlash(obj.mesh.position.clone(), color)
-        s.scene.add(fx)
-        s.kesslerFlashes.push({ mesh: fx, age: 0, duration: 1.5 })
-      }, delay)
-    }
-
-    // ── Helper: spawn debris that orbits along a satellite's path ─────
-    const spawnDebris = (satId, color, delay) => {
-      setTimeout(() => {
-        if (!s.scene) return
-        const obj = s.sats[satId]
-        if (!obj) return
-        const field = makeDebrisField({
-          radius: obj.orbitRadius,
-          tilt: obj.tilt,
-          startAngle: obj.angleOffset,
-          count: 90,
-          color,
-        })
-        s.scene.add(field.points)
-        s.debrisFields.push(field)
-      }, delay)
-    }
-
-    // ── Helper: contaminate an orbit ring to show it's now dangerous ──
-    const contaminateOrbit = (satId, color, delay) => {
-      setTimeout(() => {
-        const line = s.orbitLines[satId]
-        if (line?.material) {
-          line.material.color.set(color)
-          line.material.opacity = 0.45
-        }
-      }, delay)
-    }
-
-    // ════════════════════════════════════════════════════════
-    // Kessler cascade stages — based on actual scenario data:
-    // Primary: SAT-001 ↔ SAT-002 collision
-    // → debris spreads along SAT-002's orbit (550 km LEO)
-    // → debris hits DEBRIS-001 (already in a decaying orbit)
-    // → combined debris threatens ISS (SAT-003, 408 km)
-    // → cascade reaches other Starlink satellites
-    // ════════════════════════════════════════════════════════
-
-    // Stage 1 (t=0): Primary collision SAT-001 ↔ SAT-002
-    flash('SAT-001', 0xffffff, 0)
-    flash('SAT-002', 0xffffff, 80)
-    spawnDebris('SAT-002', 0xff6600, 200)   // orange debris cloud from Starlink
-    spawnDebris('SAT-001', 0xffaa44, 400)   // GPS debris field
-
-    // Stage 2 (t=2s): SAT-002 orbit ring shows contamination
-    contaminateOrbit('SAT-002', 0xff6600, 2000)
-
-    // Stage 3 (t=3s): Debris field reaches DEBRIS-001 (already fragile orbit)
-    // CONJ-002: SAT-001 ↔ DEBRIS-001
-    flash('DEBRIS-001', 0xff4400, 3000)
-    spawnDebris('DEBRIS-001', 0xff3300, 3200)  // red — more dangerous, larger debris
-    contaminateOrbit('DEBRIS-001', 0xff3300, 3500)
-
-    // Stage 4 (t=5s): ISS (SAT-003) threatened — CONJ-003
-    // Debris from DEBRIS-001 reaches ISS orbital altitude
-    flash('SAT-003', 0xff8800, 5000)
-    spawnDebris('SAT-003', 0xff5500, 5200)
-    contaminateOrbit('SAT-003', 0xff5500, 5500)
-
-    // Stage 5 (t=7s): SAT-001 orbit contaminated — GPS constellation at risk
-    contaminateOrbit('SAT-001', 0xffaa00, 7000)
-
-  }, [kesslerMode])
-
   // ── Settings sync ──────────────────────────────────────────────────
   useEffect(() => {
     const s = stateRef.current
@@ -1108,17 +959,36 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
         </div>
       )}
 
-      {/* ── Kessler warning banner ─────────────────────────────────── */}
-      {kesslerMode && (
+      {/* ── Agent activity feed overlay ─────────────────────────────── */}
+      {agentMessages?.length > 0 && (
         <div style={{
-          position: 'absolute', top: 50, left: '50%', transform: 'translateX(-50%)',
-          padding: '6px 18px', borderRadius: '4px',
-          background: 'rgba(160,40,40,0.25)', border: '1px solid rgba(248,113,113,0.5)',
-          color: '#f87171', fontSize: '10px', fontFamily: 'var(--font-mono)',
-          letterSpacing: '0.12em', fontWeight: '600', backdropFilter: 'blur(8px)',
-          animation: 'pulse 1.2s ease-in-out infinite', pointerEvents: 'none',
+          position: 'absolute', top: simMode ? 34 : 30, left: 14,
+          display: 'flex', flexDirection: 'column', gap: '2px',
+          maxWidth: '260px', pointerEvents: 'none',
         }}>
-          ⚠ KESSLER CASCADE IN PROGRESS
+          {agentMessages.slice(-3).map((msg, i) => {
+            const meta = AGENT_META_CANVAS[msg.agent] ?? { color: '#475569', label: (msg.agent ?? '?').slice(0, 4).toUpperCase() }
+            const firstLine = msg.message?.split('\n')[0]?.trim() ?? ''
+            return (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '3px 8px',
+                background: 'rgba(5,10,20,0.78)',
+                borderLeft: `2px solid ${meta.color}`,
+                borderRadius: '0 3px 3px 0',
+                backdropFilter: 'blur(6px)',
+              }}>
+                <span style={{
+                  color: meta.color, fontSize: '8px', fontWeight: '700',
+                  letterSpacing: '0.1em', fontFamily: 'var(--font-mono)', flexShrink: 0,
+                }}>{meta.label}</span>
+                <span style={{
+                  color: '#475569', fontSize: '8px', fontFamily: 'var(--font-mono)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{firstLine.slice(0, 38)}</span>
+              </div>
+            )
+          })}
         </div>
       )}
 
