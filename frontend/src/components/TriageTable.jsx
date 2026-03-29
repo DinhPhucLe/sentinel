@@ -53,9 +53,9 @@ export default function TriageTable({ events, selectedId, onSelect }) {
       borderRadius: '6px',
       padding: '12px',
       flexShrink: 0,
+      height: '230px',
       display: 'flex',
       flexDirection: 'column',
-      maxHeight: '240px',
     }}>
       {/* Header */}
       <div style={{
