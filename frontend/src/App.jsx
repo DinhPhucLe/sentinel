@@ -1,10 +1,12 @@
+import { useState } from 'react'
 import { useSimulation } from './hooks/useSimulation'
 import AgentLog from './components/AgentLog'
 import RiskPanel from './components/RiskPanel'
 import ControlPanel from './components/ControlPanel'
 import OrbitCanvas from './components/OrbitCanvas'
+import LandingPage from './components/LandingPage'
 
-export default function App() {
+function Dashboard() {
   const {
     agentMessages, decision, status, satellites, events,
     isRunning, connected, triggerScenario, reset,
@@ -19,6 +21,7 @@ export default function App() {
       padding: '8px',
       height: '100vh',
       background: '#020b18',
+      animation: 'dashboardFadeIn 0.8s ease',
     }}>
       {/* Header */}
       <div style={{
@@ -36,7 +39,7 @@ export default function App() {
             AUTONOMOUS ORBITAL TRAFFIC CONTROL
           </div>
           <div style={{ fontSize: '10px', color: '#334155', letterSpacing: '0.06em' }}>
-            MULTI-AGENT COLLISION AVOIDANCE SYSTEM • HACKATHON MVP
+            MULTI-AGENT COLLISION AVOIDANCE SYSTEM
           </div>
         </div>
 
@@ -130,6 +133,23 @@ export default function App() {
           ))}
         </div>
       </div>
+
+      <style>{`
+        @keyframes dashboardFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
     </div>
   )
+}
+
+export default function App() {
+  const [showDashboard, setShowDashboard] = useState(false)
+
+  if (!showDashboard) {
+    return <LandingPage onEnter={() => setShowDashboard(true)} />
+  }
+
+  return <Dashboard />
 }
