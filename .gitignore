@@ -37,3 +37,6 @@ Thumbs.db
 
 # Claude memory (local only)
 .claude/
+
+#Plan.md file
+plan.md
