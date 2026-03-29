@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react'
 import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { createEarth } from '../utils/createEarth'
 
 const EARTH_RADIUS = 2.5
@@ -81,25 +82,57 @@ export default function OrbitCanvas({ satellites, events, decision, status }) {
     s.scene = new THREE.Scene()
 
     s.camera = new THREE.PerspectiveCamera(50, el.clientWidth / el.clientHeight, 0.1, 100)
-    s.camera.position.set(0, 6, 10)
-    s.camera.lookAt(0, 0, 0)
+    s.camera.position.set(0, 5, 10)
 
-    // Stars — white/gray only
+    // Interactive orbit controls — drag to rotate, scroll to zoom
+    s.controls = new OrbitControls(s.camera, s.renderer.domElement)
+    s.controls.enableDamping = true
+    s.controls.dampingFactor = 0.06
+    s.controls.rotateSpeed = 0.5
+    s.controls.zoomSpeed = 0.8
+    s.controls.minDistance = 5
+    s.controls.maxDistance = 25
+    s.controls.autoRotate = true
+    s.controls.autoRotateSpeed = 0.4
+    s.controls.enablePan = false
+    s.controls.target.set(0, 0, 0)
+
+    // Stars — multiple layers for depth, varied sizes
+    const STAR_COUNT = 3000
     const starGeo = new THREE.BufferGeometry()
-    const starVerts = []
-    for (let i = 0; i < 1500; i++) {
-      starVerts.push(
-        (Math.random() - 0.5) * 80,
-        (Math.random() - 0.5) * 80,
-        (Math.random() - 0.5) * 80,
-      )
+    const starPos = new Float32Array(STAR_COUNT * 3)
+    const starSizes = new Float32Array(STAR_COUNT)
+    for (let i = 0; i < STAR_COUNT; i++) {
+      starPos[i * 3]     = (Math.random() - 0.5) * 100
+      starPos[i * 3 + 1] = (Math.random() - 0.5) * 100
+      starPos[i * 3 + 2] = (Math.random() - 0.5) * 100
+      starSizes[i] = Math.random() * 0.08 + 0.02
     }
-    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3))
-    s.scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
-      color: 0xffffff, size: 0.04, opacity: 0.5, transparent: true,
+    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3))
+    starGeo.setAttribute('size', new THREE.Float32BufferAttribute(starSizes, 1))
+
+    const starMat = new THREE.PointsMaterial({
+      color: 0xffffff, size: 0.06, transparent: true, opacity: 0.85,
+      sizeAttenuation: true,
+    })
+    const stars = new THREE.Points(starGeo, starMat)
+    s.scene.add(stars)
+    s.stars = stars
+
+    // Dim far-layer stars for depth
+    const farStarGeo = new THREE.BufferGeometry()
+    const farPos = new Float32Array(1500 * 3)
+    for (let i = 0; i < 1500; i++) {
+      farPos[i * 3]     = (Math.random() - 0.5) * 160
+      farPos[i * 3 + 1] = (Math.random() - 0.5) * 160
+      farPos[i * 3 + 2] = (Math.random() - 0.5) * 160
+    }
+    farStarGeo.setAttribute('position', new THREE.Float32BufferAttribute(farPos, 3))
+    s.scene.add(new THREE.Points(farStarGeo, new THREE.PointsMaterial({
+      color: 0xaabbcc, size: 0.03, transparent: true, opacity: 0.4, sizeAttenuation: true,
     })))
 
-    // Procedural 3D Earth with atmosphere, clouds, and night lights
+    // Earth
     const earth = createEarth({ radius: EARTH_RADIUS, segments: 64 })
     s.scene.add(earth.group)
     s.earthUpdate = earth.update
@@ -118,9 +151,14 @@ export default function OrbitCanvas({ satellites, events, decision, status }) {
       // Rotate Earth and clouds
       if (s.earthUpdate) s.earthUpdate(t)
 
-      s.camera.position.x = Math.sin(t * 0.08) * 10
-      s.camera.position.z = Math.cos(t * 0.08) * 10
-      s.camera.lookAt(0, 0, 0)
+      // Slowly drift stars for a living universe feel
+      if (s.stars) {
+        s.stars.rotation.y = t * 0.003
+        s.stars.rotation.x = t * 0.001
+      }
+
+      // Update interactive controls (handles damping + auto-rotate)
+      s.controls.update()
 
       Object.entries(s.sats).forEach(([id, obj]) => {
         if (!obj) return
@@ -159,6 +197,7 @@ export default function OrbitCanvas({ satellites, events, decision, status }) {
     return () => {
       cancelAnimationFrame(s.animId)
       window.removeEventListener('resize', onResize)
+      s.controls.dispose()
       s.renderer.dispose()
       el.removeChild(s.renderer.domElement)
     }
