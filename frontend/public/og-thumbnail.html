@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<!--
+  Open this file in a browser and take a 1200x630 screenshot
+  to generate og-thumbnail.png for social sharing.
+  Or use: npx capture-website-cli og-thumbnail.html --width=1200 --height=630 --output=og-thumbnail.png
+-->
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1200px; height: 630px;
+    background: #020b18;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    position: relative;
+  }
+  .content {
+    position: absolute;
+    top: 60px; left: 60px;
+    z-index: 2;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 40px;
+  }
+  .badge .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 10px #34d399;
+  }
+  .badge span {
+    font-size: 12px; color: #34d399;
+    letter-spacing: 3px; font-weight: bold;
+  }
+  .label {
+    font-size: 14px; color: #38bdf8;
+    letter-spacing: 5px; font-weight: bold;
+    margin-bottom: 12px;
+  }
+  .title {
+    font-size: 80px; font-weight: bold;
+    color: #e0f0ff; line-height: 0.95;
+    margin-bottom: 20px;
+  }
+  .title .s { color: #38bdf8; }
+  .tagline-wrapper {
+    border-left: 3px solid #38bdf8;
+    padding-left: 16px;
+    margin-bottom: 40px;
+  }
+  .tagline { font-size: 20px; color: #94a3b8; line-height: 1.5; }
+  .stats {
+    display: flex; gap: 1px;
+    background: #1e3a5f;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 30px;
+    width: fit-content;
+  }
+  .stat {
+    background: #070f1a;
+    padding: 20px 28px;
+    text-align: center;
+    min-width: 140px;
+  }
+  .stat .num { font-size: 32px; font-weight: bold; color: #e0f0ff; }
+  .stat .num.red { color: #f87171; }
+  .stat .num.blue { color: #38bdf8; }
+  .stat .lbl { font-size: 9px; color: #64748b; letter-spacing: 1.5px; margin-top: 4px; }
+  .stat .lbl.red { color: #f87171; }
+  .stat .sublbl { font-size: 8px; color: #f8717188; margin-top: 2px; }
+  .pipeline {
+    display: flex; align-items: center; gap: 0;
+    margin-bottom: 24px;
+  }
+  .pipe-box {
+    border: 1px solid; border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 10px; font-weight: bold;
+    letter-spacing: 1.5px;
+  }
+  .pipe-arrow { color: #1e3a5f; font-size: 16px; padding: 0 6px; }
+  .tech {
+    font-size: 10px; color: #334155;
+    letter-spacing: 1.5px;
+  }
+  /* Earth side */
+  .earth-container {
+    position: absolute;
+    right: -40px; top: 50%;
+    transform: translateY(-50%);
+    z-index: 1;
+  }
+  .earth {
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #0a2244 0%, #020b18 70%);
+    position: relative;
+    box-shadow: 0 0 80px #38bdf808, inset 0 0 60px #1e3a5f11;
+  }
+  .earth::after {
+    content: '';
+    position: absolute; inset: -20px;
+    border-radius: 50%;
+    background: radial-gradient(circle, transparent 60%, #38bdf808 100%);
+  }
+  .orbit {
+    position: absolute;
+    border: 1px solid;
+    border-radius: 50%;
+    opacity: 0.2;
+  }
+  .orbit-1 {
+    width: 600px; height: 220px;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-10deg);
+    border-color: #38bdf8;
+  }
+  .orbit-2 {
+    width: 680px; height: 280px;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(15deg);
+    border-color: #34d399;
+  }
+  .orbit-3 {
+    width: 760px; height: 180px;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-5deg);
+    border-color: #fbbf24;
+  }
+  .sat {
+    position: absolute;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    box-shadow: 0 0 12px currentColor;
+  }
+  .sat-1 { color: #38bdf8; background: #38bdf8; top: 160px; left: 120px; }
+  .sat-2 { color: #34d399; background: #34d399; top: 120px; right: 80px; }
+  .sat-3 { color: #fbbf24; background: #fbbf24; bottom: 100px; left: 200px; }
+  .conj-line {
+    position: absolute;
+    top: 155px; left: 128px;
+    width: 290px;
+    border-top: 2px dashed #f87171;
+    opacity: 0.5;
+    transform: rotate(-8deg);
+    transform-origin: left center;
+  }
+</style>
+</head>
+<body>
+  <div class="content">
+    <div class="badge">
+      <div class="dot"></div>
+      <span>SYSTEM ACTIVE</span>
+    </div>
+
+    <div class="label">ORBITAL DEFENSE SYSTEM</div>
+    <div class="title"><span class="s">S</span>ENTINEL</div>
+
+    <div class="tagline-wrapper">
+      <div class="tagline">
+        Autonomous Multi-Agent<br>Collision Avoidance
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="num">65K+</div>
+        <div class="lbl">OBJECTS IN ORBIT</div>
+      </div>
+      <div class="stat">
+        <div class="num red">0</div>
+        <div class="lbl red">AUTOMATED SYSTEMS</div>
+        <div class="sublbl">UNTIL NOW</div>
+      </div>
+      <div class="stat">
+        <div class="num blue">5</div>
+        <div class="lbl">AI AGENTS</div>
+      </div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-box" style="color:#38bdf8;border-color:#38bdf844">TRACK</div>
+      <div class="pipe-arrow">&#8594;</div>
+      <div class="pipe-box" style="color:#a78bfa;border-color:#a78bfa44">PREDICT</div>
+      <div class="pipe-arrow">&#8594;</div>
+      <div class="pipe-box" style="color:#34d399;border-color:#34d39944">OPTIMIZE</div>
+      <div class="pipe-arrow">&#8594;</div>
+      <div class="pipe-box" style="color:#fb923c;border-color:#fb923c44">NEGOTIATE</div>
+      <div class="pipe-arrow">&#8594;</div>
+      <div class="pipe-box" style="color:#f472b6;border-color:#f472b644">GOVERN</div>
+    </div>
+
+    <div class="tech">Google ADK &bull; Gemini 2.0 &bull; FastAPI &bull; WebSockets &bull; React &bull; Three.js</div>
+  </div>
+
+  <div class="earth-container">
+    <div class="earth">
+      <div class="orbit orbit-1"></div>
+      <div class="orbit orbit-2"></div>
+      <div class="orbit orbit-3"></div>
+      <div class="sat sat-1"></div>
+      <div class="sat sat-2"></div>
+      <div class="sat sat-3"></div>
+      <div class="conj-line"></div>
+    </div>
+  </div>
+</body>
+</html>
