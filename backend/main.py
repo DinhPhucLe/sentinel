@@ -309,13 +309,20 @@ Only emit an action when the user explicitly asks to navigate or toggle a layer.
             messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": message})
 
-    response = await acompletion(
-        model="groq/llama-3.3-70b-versatile",
-        messages=messages,
-        max_tokens=600,
-        temperature=0.3,
-    )
+    import time
+    t0 = time.time()
+    try:
+        response = await acompletion(
+            model="groq/llama-3.3-70b-versatile",
+            messages=messages,
+            max_tokens=600,
+            temperature=0.3,
+        )
+    except Exception as e:
+        logger.error(f"Chat LLM error: {e}")
+        raise HTTPException(status_code=502, detail="AI service unavailable — check GROQ_API_KEY")
 
+    elapsed_ms = round((time.time() - t0) * 1000)
     text = response.choices[0].message.content or ""
 
     # Extract optional action block
@@ -328,6 +335,7 @@ Only emit an action when the user explicitly asks to navigate or toggle a layer.
             pass
         text = text.replace(match.group(0), "").strip()
 
+    logger.info(f"Chat response: {elapsed_ms}ms | action={action['type'] if action else None}")
     return {"response": text, "action": action}
 
 
