@@ -21,6 +21,18 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
     }
   }, [status, open])
 
+  // Ctrl+/ toggles the chat panel
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.ctrlKey && e.key === '/') {
+        e.preventDefault()
+        setOpen(o => !o)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   useEffect(() => {
     if (open) {
       setUnread(0)
