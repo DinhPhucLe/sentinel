@@ -1,12 +1,9 @@
-export default function ControlPanel({ isRunning, connected, onTrigger, onReset, onKessler }) {
+export default function ControlPanel({ isRunning, connected, onTrigger, onReset }) {
   const canTrigger = !isRunning && connected
 
   return (
-    <div style={{
-      background: '#070f1a',
-      border: '1px solid #1e3a5f',
-      borderRadius: '6px',
-      padding: '16px',
+    <div className="neo-panel" style={{
+      padding: 'var(--space-lg)',
       display: 'flex',
       flexDirection: 'column',
       gap: '10px',
@@ -14,109 +11,106 @@ export default function ControlPanel({ isRunning, connected, onTrigger, onReset,
       {/* Header */}
       <div style={{
         fontSize: '11px',
-        letterSpacing: '0.1em',
-        color: '#38bdf8',
-        fontWeight: 'bold',
-        borderBottom: '1px solid #1e3a5f',
-        paddingBottom: '8px',
+        letterSpacing: '0.14em',
+        color: 'var(--accent)',
+        fontWeight: '600',
+        fontFamily: 'var(--font-display)',
+        paddingBottom: '10px',
+        borderBottom: '1px solid var(--border-subtle)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        gap: '8px',
       }}>
-        <span>CONTROL</span>
-        <span style={{
-          fontSize: '10px',
-          color: connected ? '#34d399' : '#f87171',
-          fontWeight: 'normal',
-        }}>
-          {connected ? '● CONNECTED' : '○ CONNECTING...'}
-        </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        CONTROL
       </div>
 
-      {/* Primary action */}
+      {/* Primary trigger */}
       <button
+        className="neo-button"
         onClick={() => onTrigger(false)}
         disabled={!canTrigger}
         style={{
-          padding: '12px',
-          background: canTrigger ? '#0d2d4a' : '#0a0f16',
-          border: `1px solid ${canTrigger ? '#38bdf8' : '#1e3a5f'}`,
-          borderRadius: '4px',
-          color: canTrigger ? '#38bdf8' : '#334155',
+          padding: '14px',
+          color: canTrigger ? 'var(--accent)' : 'var(--text-tertiary)',
           fontSize: '12px',
-          fontWeight: 'bold',
+          fontWeight: '600',
           letterSpacing: '0.1em',
-          cursor: canTrigger ? 'pointer' : 'not-allowed',
-          fontFamily: 'inherit',
-          transition: 'all 0.2s',
+          fontFamily: 'var(--font-display)',
+          background: canTrigger ? 'var(--accent-subtle)' : 'var(--bg-surface)',
+          borderColor: canTrigger ? 'var(--border-accent)' : 'var(--border-subtle)',
+          position: 'relative',
+          overflow: 'hidden',
         }}
-        onMouseEnter={e => canTrigger && (e.target.style.background = '#1e3a5f')}
-        onMouseLeave={e => canTrigger && (e.target.style.background = '#0d2d4a')}
       >
-        {isRunning ? '⟳ PIPELINE RUNNING...' : '▶ TRIGGER SCENARIO'}
+        {isRunning ? (
+          <span style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
+            PIPELINE RUNNING...
+          </span>
+        ) : (
+          'TRIGGER SCENARIO'
+        )}
+
+        {/* Glow effect on hover */}
+        {canTrigger && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(135deg, transparent 40%, rgba(0,200,240,0.04) 100%)',
+            pointerEvents: 'none',
+          }} />
+        )}
       </button>
 
       {/* Reset */}
       <button
+        className="neo-button"
         onClick={onReset}
         disabled={isRunning}
         style={{
-          padding: '8px',
-          background: 'transparent',
-          border: '1px solid #334155',
-          borderRadius: '4px',
-          color: isRunning ? '#334155' : '#64748b',
+          padding: '10px',
+          color: isRunning ? 'var(--text-tertiary)' : 'var(--text-secondary)',
           fontSize: '11px',
           letterSpacing: '0.08em',
-          cursor: isRunning ? 'not-allowed' : 'pointer',
-          fontFamily: 'inherit',
-          transition: 'all 0.2s',
+          fontFamily: 'var(--font-display)',
+          fontWeight: '500',
         }}
-        onMouseEnter={e => !isRunning && (e.target.style.borderColor = '#64748b')}
-        onMouseLeave={e => !isRunning && (e.target.style.borderColor = '#334155')}
       >
-        ↺ RESET
+        RESET
       </button>
 
-      {/* Kessler stretch button */}
+      {/* Kessler cascade */}
       <button
+        className="neo-button"
         onClick={() => onTrigger(true)}
         disabled={!canTrigger}
         style={{
-          padding: '8px',
-          background: 'transparent',
-          border: `1px solid ${canTrigger ? '#f4722544' : '#1e3a5f'}`,
-          borderRadius: '4px',
-          color: canTrigger ? '#fb923c' : '#334155',
+          padding: '10px',
+          color: canTrigger ? 'var(--text-secondary)' : 'var(--text-tertiary)',
           fontSize: '11px',
           letterSpacing: '0.06em',
-          cursor: canTrigger ? 'pointer' : 'not-allowed',
-          fontFamily: 'inherit',
-          transition: 'all 0.2s',
+          fontFamily: 'var(--font-display)',
+          fontWeight: '500',
+          borderColor: canTrigger ? 'rgba(224,64,80,0.12)' : 'var(--border-subtle)',
         }}
-        onMouseEnter={e => canTrigger && (e.target.style.background = '#2d1a0d')}
-        onMouseLeave={e => canTrigger && (e.target.style.background = 'transparent')}
       >
-        ⚠ TRIGGER KESSLER CASCADE
+        TRIGGER KESSLER CASCADE
       </button>
 
       {isRunning && (
         <div style={{
           fontSize: '10px',
-          color: '#64748b',
+          color: 'var(--text-tertiary)',
           textAlign: 'center',
-          animation: 'pulse 1.5s ease-in-out infinite',
+          fontFamily: 'var(--font-mono)',
+          animation: 'pulse 2s ease-in-out infinite',
+          marginTop: '2px',
         }}>
           Agents are reasoning...
         </div>
       )}
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
     </div>
   )
 }
