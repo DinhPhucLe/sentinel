@@ -23,6 +23,10 @@ from agents.optimization_agent import optimization_agent
 from agents.negotiation_agent import negotiation_agent
 from agents.governance_agent import governance_agent
 from tools.orbital_sim import get_conjunction_events, get_kessler_cascade_events, simulate_maneuver
+from tools.real_data_loader import get_real_kessler_events, get_space_environment_context
+
+# Module-level constant — loaded once when orchestrator is first imported
+_SPACE_CONTEXT = get_space_environment_context()
 
 APP_NAME = "orbital_traffic_control"
 
@@ -89,11 +93,11 @@ async def run_pipeline_streaming(
       {"type": "decision", "data": {...}}
       {"type": "status", "status": "..."}
     """
-    events = get_kessler_cascade_events() if kessler else get_conjunction_events()
+    # --- Primary event (always scripted, always SAT-001 vs SAT-002) ---
+    events = get_conjunction_events()
     if event_id:
         events = [ev for ev in events if ev.id == event_id] or events
 
-    # Serialise conjunction events as a human-readable brief for the first agent
     event_lines = []
     for ev in events:
         event_lines.append(
@@ -103,6 +107,7 @@ async def run_pipeline_streaming(
             f"miss={ev.miss_distance_km:.2f}km | "
             f"ctrl_a={ev.sat_a.controllable} ctrl_b={ev.sat_b.controllable}"
         )
+
     # Pre-compute maneuver simulations for the primary event (SAT-002)
     maneuver_lines = []
     for dv in [1.0, 5.0, 15.0]:
@@ -113,13 +118,57 @@ async def run_pipeline_streaming(
             f"status={result.get('status', 'ok')}"
         )
 
-    initial_brief = (
-        "ACTIVE CONJUNCTION EVENTS — assess immediately:\n"
-        + "\n".join(event_lines)
-        + "\n\nPRE-COMPUTED MANEUVER OPTIONS FOR SAT-002 (Starlink, 62% fuel remaining):\n"
-        + "\n".join(maneuver_lines)
-        + "\n\nSafety minimum: miss distance > 5 km, fuel cost < 30% of remaining fuel."
-    )
+    # --- Kessler cascade: real CDMs or scripted fallback ---
+    if kessler:
+        real_events = get_real_kessler_events(top_n=5)
+        if real_events:
+            cascade_lines = ["SECONDARY CONJUNCTION WARNINGS (real NORAD CDM data):"]
+            for ev in real_events:
+                cascade_lines.append(
+                    f"- {ev['id']}: {ev['sat_a_name']} ({ev['sat_a_type']}, "
+                    f"ctrl={ev['sat_a_controllable']}) ↔ "
+                    f"{ev['sat_b_name']} ({ev['sat_b_type']}, "
+                    f"ctrl={ev['sat_b_controllable']}) | "
+                    f"prob={ev['collision_probability']:.4%} | "
+                    f"TCA={ev['time_to_closest_approach_hours']:.1f}h | "
+                    f"miss={ev['miss_distance_km']:.0f}km"
+                )
+            cascade_section = "\n".join(cascade_lines)
+        else:
+            # Fallback to scripted cascade if dataset unavailable
+            cascade_events = get_kessler_cascade_events()
+            cascade_lines = ["SECONDARY CONJUNCTION WARNINGS (simulated):"]
+            for ev in cascade_events:
+                cascade_lines.append(
+                    f"- {ev.id}: {ev.sat_a.name} ↔ {ev.sat_b.name} | "
+                    f"prob={ev.collision_probability:.0%} | "
+                    f"TCA={ev.time_to_closest_approach_hours:.1f}h | "
+                    f"miss={ev.miss_distance_km:.2f}km"
+                )
+            cascade_section = "\n".join(cascade_lines)
+    else:
+        cascade_section = ""
+
+    # --- Assemble the full brief ---
+    sections = [
+        _SPACE_CONTEXT,
+        "",
+        "ACTIVE CONJUNCTION EVENTS — assess immediately:",
+        "\n".join(event_lines),
+        "",
+        "PRE-COMPUTED MANEUVER OPTIONS FOR SAT-002 (Starlink, 62% fuel remaining):",
+        "\n".join(maneuver_lines),
+    ]
+    if cascade_section:
+        sections += ["", cascade_section]
+
+    sections += [
+        "",
+        "Safety minimum: miss distance > 5 km, fuel cost < 30% of remaining fuel.",
+        "Respond with urgency. These are live events.",
+    ]
+
+    initial_brief = "\n".join(sections)
 
     # Initialise runner lazily (first call only — avoids blocking uvicorn startup)
     runner = _get_runner()

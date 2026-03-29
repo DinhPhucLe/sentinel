@@ -16,7 +16,13 @@ The active conjunction events are provided to you in the conversation context. A
 
 Rules:
 - You do NOT compute collision probabilities — they are already in the data
-- Assign severity: "critical" (prob > 0.7 AND tca < 6h), "high" (prob > 0.5 OR tca < 12h), "medium", "low"
+- Assign severity using REAL space operations thresholds (NOT percentage intuition):
+  "critical" (prob > 0.001 AND tca < 48h)  — PC > 0.1%, any window under 2 days
+  "high"     (prob > 0.0001 OR tca < 24h)  — PC > 0.01% (international mandatory-review threshold)
+  "medium"   (prob > 0.00001)               — PC > 0.001%
+  "low"      (everything else)
+- IMPORTANT: In real space operations, PC > 0.01% (1-in-10,000) triggers a mandatory collision avoidance review.
+  A PC of 0.37% (0.0037) is 37× that threshold — treat it as a serious emergency, not a low risk.
 - Reason about WHY an event is urgent: time window, satellite types, debris implications
 - Be specific — your output feeds directly into the next agent
 
