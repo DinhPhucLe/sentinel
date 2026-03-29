@@ -382,9 +382,13 @@ function Dashboard({ onBack }) {
   const [view, setView] = useState('dashboard')
   const clock = useLiveClock()
 
+  const [chatLayerOverrides, setChatLayerOverrides] = useState([])
+
   const handleChatAction = (action) => {
     if (action.type === 'SET_VIEW' && action.payload?.view) {
       setView(action.payload.view)
+    } else if (action.type === 'SET_LAYER' && action.payload) {
+      setChatLayerOverrides(prev => [...prev, action.payload])
     }
   }
 
