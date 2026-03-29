@@ -11,11 +11,16 @@ venv/
 dist/
 build/
 .pytest_cache/
+*/.pytest_cache/
 
 # Node
 node_modules/
-dist/
+*/node_modules/
+package-lock.json
 .vite/
+
+# Build output
+frontend/dist/
 
 # Environment
 .env
@@ -29,3 +34,6 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude memory (local only)
+.claude/

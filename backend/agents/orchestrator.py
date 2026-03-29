@@ -110,7 +110,7 @@ async def run_pipeline_streaming(
     # Create a fresh session per run
     user_id = "operator"
     session_id = f"run-{uuid.uuid4().hex[:8]}"
-    _session_service.create_session(
+    await _session_service.create_session(
         app_name=APP_NAME,
         user_id=user_id,
         session_id=session_id,
@@ -170,7 +170,7 @@ async def run_pipeline_streaming(
             await asyncio.sleep(0.1)
 
     # Emit the governance output as the final decision signal
-    session = _session_service.get_session(  # noqa: uses module-level ref set by _get_runner()
+    session = await _session_service.get_session(
         app_name=APP_NAME, user_id=user_id, session_id=session_id
     )
     governance_output = session.state.get("governance_validation", "") if session else ""
