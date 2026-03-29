@@ -79,6 +79,7 @@ def _extract_text(event) -> str:
 async def run_pipeline_streaming(
     emit: Callable[[dict], Any],
     kessler: bool = False,
+    event_id: str = None,
 ) -> None:
     """
     Run the full ADK agent pipeline and call emit() with each WebSocket message.
@@ -89,6 +90,8 @@ async def run_pipeline_streaming(
       {"type": "status", "status": "..."}
     """
     events = get_kessler_cascade_events() if kessler else get_conjunction_events()
+    if event_id:
+        events = [ev for ev in events if ev.id == event_id] or events
 
     # Serialise conjunction events as a human-readable brief for the first agent
     event_lines = []

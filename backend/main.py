@@ -114,6 +114,7 @@ async def trigger_scenario(body: dict = None):
 
     body = body or {}
     kessler = body.get("kessler", False)
+    event_id = body.get("event_id", None)
 
     async def run():
         global _pipeline_running
@@ -124,7 +125,7 @@ async def trigger_scenario(body: dict = None):
             async def emit(data: dict):
                 await manager.broadcast(data)
 
-            await run_pipeline_streaming(emit=emit, kessler=kessler)
+            await run_pipeline_streaming(emit=emit, kessler=kessler, event_id=event_id)
         except Exception as e:
             await manager.broadcast({
                 "type": WS_MSG_ERROR,
