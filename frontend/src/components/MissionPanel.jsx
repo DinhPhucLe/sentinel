@@ -7,24 +7,28 @@ const STATUS_CONFIG = {
   ERROR:       { label: 'ERROR',             color: '#f87171', bg: '#1a0d0d', pulse: false },
 }
 
-function RiskBar({ probability }) {
+function ProbabilityRing({ probability }) {
   const pct = Math.round(probability * 100)
   const color = pct >= 70 ? '#f87171' : pct >= 40 ? '#fb923c' : '#34d399'
-  const label = pct >= 70 ? 'CRITICAL' : pct >= 40 ? 'HIGH' : 'MEDIUM'
+  const size = 130
+  const stroke = 8
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+  const dash = circ * (1 - probability)
   return (
-    <div style={{ marginBottom: '8px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-        <span style={{ fontSize: '10px', color: '#64748b', letterSpacing: '0.08em' }}>COLLISION PROBABILITY</span>
-        <span style={{ fontSize: '10px', color, fontWeight: 'bold' }}>{label}</span>
-      </div>
-      <div style={{ height: '6px', background: '#1e3a5f', borderRadius: '3px', overflow: 'hidden' }}>
-        <div style={{
-          height: '100%', width: `${pct}%`, background: color,
-          borderRadius: '3px', transition: 'width 1s ease',
-        }} />
-      </div>
-      <div style={{ textAlign: 'right', fontSize: '12px', color, fontWeight: 'bold', marginTop: '3px' }}>
-        {pct}%
+    <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1e3a5f" strokeWidth={stroke} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+          strokeDasharray={circ} strokeDashoffset={dash} strokeLinecap="round"
+          style={{ transition: 'stroke-dashoffset 1s ease, stroke 0.5s' }} />
+      </svg>
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <span style={{ fontSize: '28px', fontWeight: 'bold', color, lineHeight: 1 }}>{pct}%</span>
+        <span style={{ fontSize: '9px', color: '#64748b', marginTop: '2px', letterSpacing: '0.08em' }}>COLLISION PROB</span>
       </div>
     </div>
   )
@@ -117,19 +121,19 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
       {/* Risk info for selected event */}
       {selectedEvent ? (
         <div style={{ flexShrink: 0 }}>
-          <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px' }}>
+          <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', marginBottom: '10px' }}>
             <span style={{ color: '#e0f0ff' }}>{selectedEvent.sat_a?.name}</span>
             <span style={{ margin: '0 6px' }}>↔</span>
             <span style={{ color: '#e0f0ff' }}>{selectedEvent.sat_b?.name}</span>
           </div>
-          <RiskBar probability={prob} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+          <ProbabilityRing probability={prob} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '12px' }}>
             <span style={{ color: '#64748b' }}>TCA</span>
             <span style={{ color: '#e0f0ff', fontWeight: 'bold', fontFamily: 'monospace' }}>
               {String(th).padStart(2, '0')}h {String(tm).padStart(2, '0')}m
             </span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '3px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '4px' }}>
             <span style={{ color: '#64748b' }}>MISS DIST</span>
             <span style={{ color: '#e0f0ff', fontFamily: 'monospace' }}>{selectedEvent.miss_distance_km?.toFixed(3)} km</span>
           </div>
