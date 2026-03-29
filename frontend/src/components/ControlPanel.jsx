@@ -1,5 +1,5 @@
-export default function ControlPanel({ isRunning, connected, onTrigger, onReset, onKessler }) {
-  const canTrigger = !isRunning && connected
+export default function ControlPanel({ isRunning, connected, onTrigger, onReset, selectedEvent }) {
+  const canTrigger = !isRunning && connected && !!selectedEvent
 
   return (
     <div style={{
@@ -33,9 +33,15 @@ export default function ControlPanel({ isRunning, connected, onTrigger, onReset,
         </span>
       </div>
 
+      {!selectedEvent && !isRunning && (
+        <div style={{ fontSize: '10px', color: '#475569', textAlign: 'center', letterSpacing: '0.06em' }}>
+          Select a conjunction above to enable
+        </div>
+      )}
+
       {/* Primary action */}
       <button
-        onClick={() => onTrigger(false)}
+        onClick={() => onTrigger(false, selectedEvent?.id)}
         disabled={!canTrigger}
         style={{
           padding: '12px',
@@ -80,7 +86,7 @@ export default function ControlPanel({ isRunning, connected, onTrigger, onReset,
 
       {/* Kessler stretch button */}
       <button
-        onClick={() => onTrigger(true)}
+        onClick={() => onTrigger(true, selectedEvent?.id)}
         disabled={!canTrigger}
         style={{
           padding: '8px',

@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useSimulation } from './hooks/useSimulation'
 import AgentLog from './components/AgentLog'
 import RiskPanel from './components/RiskPanel'
 import ControlPanel from './components/ControlPanel'
 import OrbitCanvas from './components/OrbitCanvas'
+import TriageTable from './components/TriageTable'
 
 export default function App() {
   const {
@@ -10,15 +12,18 @@ export default function App() {
     isRunning, connected, triggerScenario, reset,
   } = useSimulation()
 
+  const [selectedEvent, setSelectedEvent] = useState(null)
+
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: '1fr 320px',
+      gridTemplateColumns: '60% 40%',
       gridTemplateRows: 'auto 1fr',
       gap: '8px',
       padding: '8px',
       height: '100vh',
       background: '#020b18',
+      boxSizing: 'border-box',
     }}>
       {/* Header */}
       <div style={{
@@ -39,12 +44,10 @@ export default function App() {
             MULTI-AGENT COLLISION AVOIDANCE SYSTEM • HACKATHON MVP
           </div>
         </div>
-
-        {/* Live satellite count */}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '20px' }}>
           {[
             { label: 'SATELLITES TRACKED', value: satellites.length },
-            { label: 'ACTIVE EVENTS', value: events.length },
+            { label: 'ACTIVE CONJUNCTIONS', value: events.length },
             { label: 'PIPELINE STATUS', value: status },
           ].map(({ label, value }) => (
             <div key={label} style={{ textAlign: 'center' }}>
@@ -55,14 +58,13 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main content area */}
+      {/* Left — orbit canvas + agent log */}
       <div style={{
         display: 'grid',
-        gridTemplateRows: '1fr 280px',
+        gridTemplateRows: '1fr 260px',
         gap: '8px',
         minHeight: 0,
       }}>
-        {/* Orbit canvas */}
         <div style={{
           background: '#040c16',
           border: '1px solid #1e3a5f',
@@ -76,12 +78,10 @@ export default function App() {
             status={status}
           />
         </div>
-
-        {/* Agent log */}
         <AgentLog messages={agentMessages} />
       </div>
 
-      {/* Right sidebar */}
+      {/* Right — triage table + risk panel + control */}
       <div style={{
         display: 'flex',
         flexDirection: 'column',
@@ -89,46 +89,25 @@ export default function App() {
         minHeight: 0,
         overflowY: 'auto',
       }}>
-        <RiskPanel status={status} events={events} decision={decision} />
+        <TriageTable
+          events={events}
+          selectedId={selectedEvent?.id}
+          onSelect={ev => setSelectedEvent(prev => prev?.id === ev.id ? null : ev)}
+        />
+
+        <RiskPanel
+          status={status}
+          events={selectedEvent ? [selectedEvent] : events}
+          decision={decision}
+        />
+
         <ControlPanel
           isRunning={isRunning}
           connected={connected}
           onTrigger={triggerScenario}
-          onReset={reset}
+          onReset={() => { reset(); setSelectedEvent(null) }}
+          selectedEvent={selectedEvent}
         />
-
-        {/* Satellite roster */}
-        <div style={{
-          background: '#070f1a',
-          border: '1px solid #1e3a5f',
-          borderRadius: '6px',
-          padding: '12px',
-          flex: 1,
-        }}>
-          <div style={{
-            fontSize: '11px', letterSpacing: '0.1em', color: '#38bdf8',
-            fontWeight: 'bold', borderBottom: '1px solid #1e3a5f',
-            paddingBottom: '8px', marginBottom: '10px',
-          }}>
-            SATELLITE ROSTER
-          </div>
-          {satellites.map(sat => (
-            <div key={sat.id} style={{
-              fontSize: '11px', marginBottom: '8px',
-              paddingBottom: '8px', borderBottom: '1px solid #0d1e30',
-            }}>
-              <div style={{ color: '#e0f0ff', fontWeight: 'bold' }}>{sat.name}</div>
-              <div style={{ color: '#64748b', marginTop: '2px' }}>
-                {sat.id} • P{sat.priority} • {sat.operator}
-              </div>
-              <div style={{ color: '#64748b' }}>
-                Alt: {sat.altitude_km.toLocaleString()} km •
-                Fuel: {(sat.fuel_remaining * 100).toFixed(0)}% •
-                {sat.controllable ? ' ✓ ctrl' : ' ✗ inert'}
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   )
