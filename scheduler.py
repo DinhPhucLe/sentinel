@@ -84,7 +84,25 @@ def is_due(group_name: str, state: dict, now: datetime, run_now: bool) -> bool:
     return elapsed >= SCHEDULE_GROUPS[group_name]["interval_seconds"]
 
 
-def run_due_groups(state: dict, run_now: bool) -> bool:
+def next_run_str(group_name: str, state: dict) -> str:
+    group_state = state.get("groups", {}).get(group_name, {})
+    last_success = group_state.get("last_success_utc")
+    if not last_success:
+        return "now (never run)"
+    last_dt = parse_utc(last_success)
+    if not last_dt:
+        return "now (unknown)"
+    interval = SCHEDULE_GROUPS[group_name]["interval_seconds"]
+    next_dt = last_dt.timestamp() + interval
+    remaining = next_dt - utc_now().timestamp()
+    if remaining <= 0:
+        return "now (overdue)"
+    h, rem = divmod(int(remaining), 3600)
+    m = rem // 60
+    return f"in {h}h {m:02d}m"
+
+
+def run_due_groups(state: dict, run_now: bool, dry_run: bool = False) -> bool:
     now = utc_now()
     ran_any = False
     groups = state.setdefault("groups", {})
@@ -92,14 +110,21 @@ def run_due_groups(state: dict, run_now: bool) -> bool:
 
     for group_name, cfg in SCHEDULE_GROUPS.items():
         if not is_due(group_name, state, now, run_now):
+            print(f"  [{group_name}] next run: {next_run_str(group_name, state)}")
             continue
 
         files = [f for f in cfg["files"] if f in existing_files]
         if not files:
             print(f"\n[{iso_utc(utc_now())}] Skipping group: {group_name} (no matching existing files)")
             continue
+
+        if dry_run:
+            print(f"\n[DRY-RUN] Would run group: {group_name}")
+            print(f"  Files: {', '.join(files)}")
+            continue
+
         print(f"\n[{iso_utc(utc_now())}] Running group: {group_name}")
-        print(f"Files: {', '.join(files)}")
+        print(f"  Files: {', '.join(files)}")
         summary = download_all(selected_files=files, existing_only=True)
 
         ran_any = True
@@ -108,6 +133,7 @@ def run_due_groups(state: dict, run_now: bool) -> bool:
         groups[group_name]["last_summary"] = summary
         if summary:
             groups[group_name]["last_success_utc"] = iso_utc(utc_now())
+            print(f"  Done — {len(summary)} file(s) updated")
 
     return ran_any
 
@@ -130,6 +156,11 @@ def main():
         action="store_true",
         help="Check and run due groups one time, then exit.",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show which groups would run without downloading anything.",
+    )
     args = parser.parse_args()
 
     print("Space-Track scheduler started")
@@ -138,12 +169,15 @@ def main():
         hours = cfg["interval_seconds"] / 3600
         print(f" - {group_name}: every {hours:g}h")
 
+    if args.dry_run:
+        print("[DRY-RUN mode — no downloads will occur]")
+
     try:
         while True:
             state = load_state()
-            ran_any = run_due_groups(state, run_now=args.run_now)
+            ran_any = run_due_groups(state, run_now=args.run_now, dry_run=args.dry_run)
 
-            if ran_any:
+            if ran_any and not args.dry_run:
                 print(f"\n[{iso_utc(utc_now())}] Running processor.py")
                 run_processor()
                 print(f"[{iso_utc(utc_now())}] Processing complete")
