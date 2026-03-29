@@ -235,10 +235,9 @@ export default function LandingPage({ onEnter }) {
             {subtitle}
           </div>
 
-          {/* CTA + Tech marquee — same row */}
+          {/* CTA button */}
           <div style={{
             marginTop: '28px',
-            display: 'flex', alignItems: 'center', gap: '24px',
             opacity: bottomVisible ? 1 : 0,
             transform: bottomVisible ? 'translateY(0)' : 'translateY(10px)',
             transition: 'all 0.6s ease',
@@ -251,41 +250,10 @@ export default function LandingPage({ onEnter }) {
                 padding: '14px 48px',
                 fontSize: '13px', fontWeight: '600',
                 letterSpacing: '0.18em',
-                flexShrink: 0,
               }}
             >
               LAUNCH MISSION CONTROL
             </button>
-            {/* Tech marquee scrolling to the right of button */}
-            <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', position: 'relative' }}>
-              {/* Right fade */}
-              <div style={{
-                position: 'absolute', right: 0, top: 0, bottom: 0, width: '40px', zIndex: 2,
-                background: 'linear-gradient(270deg, rgba(0,0,0,0.9) 0%, transparent 100%)',
-                pointerEvents: 'none',
-              }} />
-              <div style={{
-                display: 'flex', gap: '36px', alignItems: 'center',
-                animation: 'marqueeScroll 25s linear infinite',
-                width: 'max-content',
-              }}>
-                {[...TECH_STACK, ...TECH_STACK].map((tech, i) => (
-                  <div key={`${tech.name}-${i}`} style={{
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                    color: 'rgba(255,255,255,0.2)',
-                    flexShrink: 0,
-                  }}>
-                    {tech.icon}
-                    <span style={{
-                      fontSize: '11px', fontFamily: 'var(--font-display)',
-                      fontWeight: '500', whiteSpace: 'nowrap',
-                    }}>
-                      {tech.name}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
 
@@ -328,15 +296,14 @@ export default function LandingPage({ onEnter }) {
             ))}
           </div>
 
-          {/* Pipeline + Tech — clean inline */}
+          {/* Pipeline (left) + Tech marquee (right, same line) */}
           <div style={{
-            display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between',
+            display: 'flex', alignItems: 'center', gap: '16px',
             opacity: bottomVisible ? 1 : 0,
             transition: 'all 0.6s ease 0.4s',
           }}>
             {/* Pipeline */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
               {pipeline.map((name, i) => (
                 <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{
@@ -358,9 +325,36 @@ export default function LandingPage({ onEnter }) {
               ))}
             </div>
 
+            {/* Spacer */}
+            <div style={{ width: '40px', flexShrink: 0 }} />
+
+            {/* Tech marquee — scrolling, fills remaining width */}
+            <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', opacity: 0.35, filter: 'blur(0.4px)' }}>
+              <div style={{
+                display: 'flex', gap: '56px', alignItems: 'center',
+                animation: 'marqueeScroll 14s linear infinite',
+                width: 'max-content',
+              }}>
+                {[...TECH_STACK, ...TECH_STACK].map((tech, i) => (
+                  <div key={`${tech.name}-${i}`} style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    color: '#fff', flexShrink: 0,
+                  }}>
+                    {tech.icon}
+                    <span style={{
+                      fontSize: '10px', fontFamily: 'var(--font-display)',
+                      fontWeight: '500', whiteSpace: 'nowrap',
+                    }}>
+                      {tech.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
       {/* Logo entrance animations */}
       <style>{`
         @keyframes logoReveal {
