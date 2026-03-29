@@ -5,6 +5,8 @@ Routes:
   GET  /api/satellites       — all satellites from mock data
   GET  /api/events           — current conjunction events
   POST /api/trigger-scenario — starts the agent pipeline
+  POST /api/reset            — resets pipeline to MONITORING state
+  POST /api/chat             — AI assistant (Groq) with live orbital context
   WS   /ws/agent-stream      — streams agent_log entries in real time
 """
 
