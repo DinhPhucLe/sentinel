@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSimulation } from './hooks/useSimulation'
 import AgentLog from './components/AgentLog'
 import RiskPanel from './components/RiskPanel'

@@ -37,6 +37,7 @@ function StarField({ canvasRef }) {
     scene.add(earth.group)
 
     // Orbit rings — all same monochrome cyan with varying opacity
+    const earthPos = earth.group.position
     const orbitRadii = [2.6, 3.2, 4.0]
     const orbitTilts = [0.3, -0.15, 0.5]
     const orbitOpacities = [0.12, 0.08, 0.06]
@@ -45,9 +46,9 @@ function StarField({ canvasRef }) {
       for (let j = 0; j <= 128; j++) {
         const a = (j / 128) * Math.PI * 2
         pts.push(new THREE.Vector3(
-          earth.position.x + Math.cos(a) * r,
-          earth.position.y + Math.sin(a) * r * Math.sin(orbitTilts[i]),
-          earth.position.z + Math.sin(a) * r * Math.cos(orbitTilts[i]),
+          earthPos.x + Math.cos(a) * r,
+          earthPos.y + Math.sin(a) * r * Math.sin(orbitTilts[i]),
+          earthPos.z + Math.sin(a) * r * Math.cos(orbitTilts[i]),
         ))
       }
       scene.add(new THREE.Line(
@@ -88,15 +89,15 @@ function StarField({ canvasRef }) {
       animId = requestAnimationFrame(animate)
       const t = clock.getElapsedTime()
 
-      earth.rotation.y = t * 0.05
-      wire.rotation.y = t * 0.05
+      // Rotate Earth, clouds, atmosphere
+      earth.update(t)
 
       satMeshes.forEach((s) => {
         const a = t * s.speed + s.offset
         s.mesh.position.set(
-          earth.position.x + Math.cos(a) * s.radius,
-          earth.position.y + Math.sin(a) * s.radius * Math.sin(s.tilt),
-          earth.position.z + Math.sin(a) * s.radius * Math.cos(s.tilt),
+          earthPos.x + Math.cos(a) * s.radius,
+          earthPos.y + Math.sin(a) * s.radius * Math.sin(s.tilt),
+          earthPos.z + Math.sin(a) * s.radius * Math.cos(s.tilt),
         )
       })
 
