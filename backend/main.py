@@ -21,6 +21,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 # Ensure backend package root is on path
 import sys
@@ -29,8 +31,6 @@ sys.path.insert(0, os.path.dirname(__file__))
 from models import Satellite, ConjunctionEvent
 from tools.orbital_sim import get_conjunction_events, get_kessler_cascade_events
 from config import WS_MSG_AGENT, WS_MSG_DECISION, WS_MSG_STATUS, WS_MSG_ERROR
-
-_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +86,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_DATA_DIR = Path(__file__).parent.parent / "data"
+
+# Serve data files (debris cloud JSON for frontend visualization)
+if _DATA_DIR.exists():
+    app.mount(
+        "/data",
+        StaticFiles(directory=str(_DATA_DIR)),
+        name="data",
+    )
+
 
 # ---------------------------------------------------------------------------
 # REST endpoints
@@ -93,10 +103,8 @@ app.add_middleware(
 
 @app.get("/api/satellites")
 async def get_satellites():
-    path = os.path.join(_DATA_DIR, "mock_satellites.json")
-    with open(path) as f:
-        data = json.load(f)
-    return data
+    from tools.real_data_loader import get_real_satellites
+    return get_real_satellites()
 
 
 @app.get("/api/events")
