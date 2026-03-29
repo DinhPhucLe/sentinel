@@ -29,13 +29,13 @@ const SAT_HEX = {
   US: '#7090A0', GER: '#80B060', CHLE: '#C0A050', UNKNOWN: '#606870',
 }
 
-// Real-world PC thresholds matching NORAD operational standards
-// PC > 0.01% (0.0001) = mandatory review; > 0.5% = critical emergency
+// Absolute 10x-step thresholds based on NORAD operational standards (not data-fitted)
+// 0.01% = mandatory review threshold; 0.1% = serious concern; 1% = critical emergency
 const CONJ_TIERS = [
-  { key: 'CRITICAL', label: 'CRITICAL', color: '#f87171', test: p => p >= 0.005 },
-  { key: 'HIGH',     label: 'HIGH',     color: '#fb923c', test: p => p >= 0.001 && p < 0.005 },
-  { key: 'MEDIUM',   label: 'MEDIUM',   color: '#fbbf24', test: p => p >= 0.0003 && p < 0.001 },
-  { key: 'LOW',      label: 'LOW',      color: '#34d399', test: p => p < 0.0003 },
+  { key: 'CRITICAL', label: 'CRITICAL', color: '#f87171', test: p => p >= 0.01 },                // ≥1%
+  { key: 'HIGH',     label: 'HIGH',     color: '#fb923c', test: p => p >= 0.001 && p < 0.01 },   // 0.1–1%
+  { key: 'MEDIUM',   label: 'MEDIUM',   color: '#fbbf24', test: p => p >= 0.0001 && p < 0.001 }, // 0.01–0.1%
+  { key: 'LOW',      label: 'LOW',      color: '#34d399', test: p => p < 0.0001 },               // <0.01%
 ]
 const CONJ_COLOR_THREE = { CRITICAL: 0xf87171, HIGH: 0xfb923c, MEDIUM: 0xfbbf24, LOW: 0x34d399 }
 
