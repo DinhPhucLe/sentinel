@@ -10,8 +10,8 @@ const STATUS_CONFIG = {
 function ProbabilityRing({ probability }) {
   const pct = Math.round(probability * 100)
   const color = pct >= 70 ? '#f87171' : pct >= 40 ? '#fb923c' : '#34d399'
-  const size = 130
-  const stroke = 8
+  const size = 100
+  const stroke = 7
   const r = (size - stroke) / 2
   const circ = 2 * Math.PI * r
   const dash = circ * (1 - probability)
@@ -76,21 +76,16 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
 
   return (
     <div style={{
-      flex: 1,
-      minHeight: 0,
-      background: '#070f1a',
-      border: '1px solid #1e3a5f',
-      borderRadius: '6px',
-      padding: '12px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '10px',
+      flex: 1, minHeight: 0,
+      background: '#070f1a', border: '1px solid #1e3a5f', borderRadius: '6px',
+      padding: '10px 12px',
+      display: 'flex', flexDirection: 'column', gap: '0',
       overflow: 'hidden',
     }}>
-      {/* Header row */}
+      {/* Header row — fixed */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        borderBottom: '1px solid #1e3a5f', paddingBottom: '8px',
+        borderBottom: '1px solid #1e3a5f', paddingBottom: '8px', marginBottom: '8px',
         flexShrink: 0,
       }}>
         <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#38bdf8', letterSpacing: '0.1em' }}>
@@ -101,60 +96,49 @@ export default function MissionPanel({ status, selectedEvent, decision, isRunnin
         </span>
       </div>
 
-      {/* Status badge */}
+      {/* Status badge — fixed */}
       <div style={{
         flexShrink: 0,
-        padding: '6px 12px',
-        borderRadius: '4px',
-        background: cfg.bg,
-        border: `1px solid ${cfg.color}44`,
-        color: cfg.color,
-        fontSize: '11px',
-        fontWeight: 'bold',
-        letterSpacing: '0.12em',
-        textAlign: 'center',
+        padding: '5px 12px', marginBottom: '8px',
+        borderRadius: '4px', background: cfg.bg, border: `1px solid ${cfg.color}44`,
+        color: cfg.color, fontSize: '11px', fontWeight: 'bold',
+        letterSpacing: '0.12em', textAlign: 'center',
         animation: cfg.pulse ? 'pulse 1.5s ease-in-out infinite' : 'none',
       }}>
         {cfg.label}
       </div>
 
-      {/* Risk info for selected event */}
-      {selectedEvent ? (
-        <div style={{ flexShrink: 0 }}>
-          <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', marginBottom: '10px' }}>
-            <span style={{ color: '#e0f0ff' }}>{selectedEvent.sat_a?.name}</span>
-            <span style={{ margin: '0 6px' }}>↔</span>
-            <span style={{ color: '#e0f0ff' }}>{selectedEvent.sat_b?.name}</span>
+      {/* Scrollable middle — event info + decision card */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', marginBottom: '8px' }}>
+        {selectedEvent ? (
+          <>
+            <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', marginBottom: '8px' }}>
+              <span style={{ color: '#e0f0ff' }}>{selectedEvent.sat_a?.name}</span>
+              <span style={{ margin: '0 6px' }}>↔</span>
+              <span style={{ color: '#e0f0ff' }}>{selectedEvent.sat_b?.name}</span>
+            </div>
+            <ProbabilityRing probability={prob} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '10px' }}>
+              <span style={{ color: '#64748b' }}>TCA</span>
+              <span style={{ color: '#e0f0ff', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                {String(th).padStart(2, '0')}h {String(tm).padStart(2, '0')}m
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '4px' }}>
+              <span style={{ color: '#64748b' }}>MISS DIST</span>
+              <span style={{ color: '#e0f0ff', fontFamily: 'monospace' }}>{selectedEvent.miss_distance_km?.toFixed(3)} km</span>
+            </div>
+            {decision && <div style={{ marginTop: '10px' }}><DecisionCard decision={decision} /></div>}
+          </>
+        ) : (
+          <div style={{ fontSize: '10px', color: '#334155', textAlign: 'center', letterSpacing: '0.06em', paddingTop: '8px' }}>
+            Select a conjunction to enable analysis
           </div>
-          <ProbabilityRing probability={prob} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '12px' }}>
-            <span style={{ color: '#64748b' }}>TCA</span>
-            <span style={{ color: '#e0f0ff', fontWeight: 'bold', fontFamily: 'monospace' }}>
-              {String(th).padStart(2, '0')}h {String(tm).padStart(2, '0')}m
-            </span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '4px' }}>
-            <span style={{ color: '#64748b' }}>MISS DIST</span>
-            <span style={{ color: '#e0f0ff', fontFamily: 'monospace' }}>{selectedEvent.miss_distance_km?.toFixed(3)} km</span>
-          </div>
-        </div>
-      ) : (
-        <div style={{ flexShrink: 0, fontSize: '10px', color: '#334155', textAlign: 'center', letterSpacing: '0.06em' }}>
-          Select a conjunction to enable analysis
-        </div>
-      )}
+        )}
+        {!selectedEvent && decision && <div style={{ marginTop: '8px' }}><DecisionCard decision={decision} /></div>}
+      </div>
 
-      {/* Decision card — scrollable if tall */}
-      {decision && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-          <DecisionCard decision={decision} />
-        </div>
-      )}
-
-      {/* Spacer pushes controls to bottom */}
-      {!decision && <div style={{ flex: 1 }} />}
-
-      {/* Controls */}
+      {/* Controls — always anchored to bottom */}
       <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <button
           onClick={() => onTrigger(false, selectedEvent?.id)}
