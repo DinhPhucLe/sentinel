@@ -106,7 +106,7 @@ function Dashboard({ onBack }) {
   } = useSimulation()
 
   return (
-    <div className="scan-line" style={{
+    <div style={{
       display: 'grid',
       gridTemplateColumns: '1fr 320px',
       gridTemplateRows: 'auto 1fr',
