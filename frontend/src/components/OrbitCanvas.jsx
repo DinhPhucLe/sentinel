@@ -360,6 +360,9 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
     sats: {},
     conjTiers: { CRITICAL: true, HIGH: true, MEDIUM: true, LOW: true },
   })
+  // Always reflects latest layers so the animation loop can read it without stale closures
+  const layersRef = useRef(layers)
+  useEffect(() => { layersRef.current = layers }, [layers])
 
   // ── Three.js init ──────────────────────────────────────────────────
   useEffect(() => {
@@ -614,6 +617,19 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
           s.controls.maxDistance = 25
           s.controls.zoomSpeed = 0.8
           s.controls.autoRotate = !s.paused
+          // Apply current layers now that simPhase is null (layers useEffect was blocked during exit)
+          const L = layersRef.current
+          Object.entries(s.orbitLines).forEach(([key, obj]) => {
+            if (!obj) return
+            if (key.endsWith('_label')) obj.visible = L.sats[key.replace('_label', '')] !== false
+            else obj.visible = L.orbitRings && L.sats[key] !== false
+          })
+          Object.entries(s.sats).forEach(([id, obj]) => {
+            if (obj) obj.mesh.visible = L.sats[id] !== false
+          })
+          Object.entries(s.conjLines).forEach(([, line]) => {
+            if (line) line.visible = L.conjTiers[line._tier] !== false
+          })
         }
       }
 
@@ -872,10 +888,10 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
       Object.values(s.conjLines).forEach(line => {
         if (line) { line.visible = true; line.material.opacity = 0.6 }
       })
-      // Reset layer toggles so UI reflects the restored state
+      // Full show-all: reset every layer toggle so the UI reflects the restored state
       setLayers(prev => ({
-        ...prev,
         orbitRings: true,
+        sats: Object.fromEntries(Object.keys(prev.sats).map(id => [id, true])),
         conjTiers: { CRITICAL: true, HIGH: true, MEDIUM: true, LOW: true },
       }))
       setFocusSatId(null)
