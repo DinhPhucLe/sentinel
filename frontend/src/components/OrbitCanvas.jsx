@@ -13,11 +13,13 @@ function altToRadius(alt) {
 }
 
 const SAT_COLORS = {
-  GPS:      0x00C8F0,
-  STARLINK: 0x90B0C0,
-  ISS:      0xD0D8E0,
-  DEBRIS:   0x505860,
-  UNKNOWN:  0x606870,
+  GPS:       0x00C8F0,
+  STARLINK:  0x90B0C0,
+  ISS:       0xD0D8E0,
+  DEBRIS:    0x505860,
+  JAXA:      0x00B4E0,
+  ROSCOSMOS: 0xE07040,
+  UNKNOWN:   0x606870,
 }
 
 const SAT_HEX = {
@@ -438,6 +440,9 @@ export default function OrbitCanvas({ satellites, events, decision, status }) {
     const earth = createEarth({ radius: EARTH_RADIUS, segments: 64 })
     s.scene.add(earth.group)
     s.earthUpdate = earth.update
+
+    // Load real debris point cloud (non-blocking — gracefully skipped if unavailable)
+    loadDebrisCloud(s.scene)
 
     const onResize = () => {
       s.renderer.setSize(el.clientWidth, el.clientHeight)
