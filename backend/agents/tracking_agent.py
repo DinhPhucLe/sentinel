@@ -8,10 +8,7 @@ outputs a prioritised assessment. Does NOT compute probabilities.
 from google.adk.agents import LlmAgent
 from config import AGENT_MODEL
 
-tracking_agent = LlmAgent(
-    name="tracking_agent",
-    model=AGENT_MODEL,
-    instruction="""You are the Tracking Agent in an Autonomous Orbital Traffic Control system.
+_INSTRUCTION = """You are the Tracking Agent in an Autonomous Orbital Traffic Control system.
 
 Output ONLY the following format. No preamble, no "Certainly!", no extra text. Substitute actual values from the data.
 
@@ -42,7 +39,17 @@ Rules for filling in the template:
 - THREAT LEVEL: CRITICAL if prob > 0.7 AND tca < 6h; HIGH if prob > 0.5 OR tca < 12h; MEDIUM or LOW otherwise
 - Do NOT compute probabilities — copy them directly from the data
 - Keep ASSESSMENT to 2 sentences maximum — no padding, no hedging
-""",
-    tools=[],
-    output_key="tracking_assessment",
-)
+"""
+
+
+def make_tracking_agent(model: str) -> LlmAgent:
+    return LlmAgent(
+        name="tracking_agent",
+        model=model,
+        instruction=_INSTRUCTION,
+        tools=[],
+        output_key="tracking_assessment",
+    )
+
+
+tracking_agent = make_tracking_agent(AGENT_MODEL)
