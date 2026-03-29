@@ -70,10 +70,18 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
               <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-heading)', fontFamily: 'var(--font-display)', letterSpacing: '0.12em' }}>SENTINEL AI</span>
               <span style={{ fontSize: '9px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em' }}>ASSISTANT</span>
             </div>
-            <button onClick={() => setOpen(false)} style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--text-tertiary)', fontSize: '18px', lineHeight: 1, padding: '2px 4px',
-            }}>×</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button onClick={() => setMessages([{ role: 'assistant', content: WELCOME }])} title="Clear chat" style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-tertiary)', padding: '2px 4px', lineHeight: 1,
+              }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+              </button>
+              <button onClick={() => setOpen(false)} style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-tertiary)', fontSize: '18px', lineHeight: 1, padding: '2px 4px',
+              }}>×</button>
+            </div>
           </div>
 
           {/* Messages */}
