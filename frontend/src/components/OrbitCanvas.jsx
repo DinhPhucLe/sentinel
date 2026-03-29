@@ -606,7 +606,7 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
       if (s.simPhase === 'exiting') {
         s.simLerpT = Math.min(s.simLerpT + 0.012, 1)
         const ease = 1 - Math.pow(1 - s.simLerpT, 3)
-        s.camera.position.lerpVectors(s.simExitCamStart, new THREE.Vector3(0, 5, 10), ease)
+        s.camera.position.lerpVectors(s.simExitCamStart, new THREE.Vector3(0, 7, 14), ease)
         s.controls.target.lerpVectors(s.simExitTargetStart, new THREE.Vector3(0, 0, 0), ease)
         if (s.simLerpT >= 1) {
           s.simPhase = null
@@ -840,12 +840,18 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
       s.simRedLine = null; s.simGreenArc = null; s.simArrows = []
       s.simFocusId = null; s.simPartnerFocusId = null
 
-      // Restore normal orbit line visibility (based on layers)
-      Object.entries(s.orbitLines).forEach(([key, line]) => {
-        if (!line) return
-        if (key.endsWith('_label')) { line.visible = true; return }
-        line.visible = true
+      // Restore everything — all objects, orbit rings, conjunction lines
+      Object.values(s.orbitLines).forEach(line => { if (line) line.visible = true })
+      Object.values(s.sats).forEach(obj => { if (obj) obj.mesh.visible = true })
+      Object.values(s.conjLines).forEach(line => {
+        if (line) { line.visible = true; line.material.opacity = 0.6 }
       })
+      // Reset layer toggles so UI reflects the restored state
+      setLayers(prev => ({
+        ...prev,
+        orbitRings: true,
+        conjTiers: { CRITICAL: true, HIGH: true, MEDIUM: true, LOW: true },
+      }))
       setFocusSatId(null)
     }
   }, [simMode])
