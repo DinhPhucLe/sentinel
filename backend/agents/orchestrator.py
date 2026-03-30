@@ -149,7 +149,7 @@ def _build_maneuver_table() -> str:
             f"{sat_obj.name} ({sat_obj.id}, P{sat_obj.priority}, "
             f"{sat_obj.fuel_remaining * 100:.0f}% fuel) — maneuver candidate:"
         )
-        for dv in [1.0, 5.0, 15.0, 25.0]:
+        for dv in [1.0, 5.0, 15.0]:
             r = simulate_maneuver(sat_obj.id, dv)
             fuel_pct = r["fuel_consumed"] * 100
             primary_ok = r["new_miss_distance_km"] > 5.0 and r["fuel_consumed"] < sat_obj.fuel_remaining * 0.30
@@ -305,22 +305,13 @@ async def run_pipeline_streaming(
 
     maneuver_table = _build_maneuver_table()
 
-    sat_data = get_real_satellites()
-    catalog_lines = ["ALL TRACKED OBJECTS IN THIS SCENARIO (positions at epoch):"]
-    for s in sat_data["satellites"]:
-        catalog_lines.append(
-            f"  {s['id']} | {s['name']} | {s['operator']} | P{s['priority']} | "
-            f"alt {s['altitude_km']:.0f} km | fuel {s['fuel_remaining']*100:.0f}% | "
-            f"controllable={s['controllable']}"
-        )
-    satellite_catalog = "\n".join(catalog_lines)
-
     base_brief = (
         "ACTIVE CONJUNCTION EVENTS:\n"
         + "\n".join(event_lines)
         + "\n\n"
-        + satellite_catalog
-        + "\n\nAVAILABLE MANEUVER OPTIONS (pre-computed, secondary conflicts checked at TCA):\n"
+        + "Only the active event summary and maneuver candidates are included here to conserve tokens.\n"
+        + "Secondary-conflict screening was already run against the rest of the tracked catalog at TCA.\n\n"
+        + "AVAILABLE MANEUVER OPTIONS (pre-computed, secondary conflicts checked at TCA):\n"
         + maneuver_table
         + "\n\nGovernance rules: miss distance > 5 km, fuel cost < 30% of remaining fuel, "
         + "only controllable satellites may maneuver, no new secondary conflicts introduced."
