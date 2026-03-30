@@ -160,7 +160,7 @@ export default function LandingPage({ onEnter }) {
             fontSize: '9px', color: 'var(--text-tertiary)',
             letterSpacing: '0.1em', fontFamily: 'var(--font-display)',
           }}>
-            HACKUSF 2025
+            HACKUSF 2026
           </span>
         </div>
 
@@ -177,7 +177,7 @@ export default function LandingPage({ onEnter }) {
         }}>
           <div style={{
             fontSize: '10px', letterSpacing: '0.3em',
-            color: 'rgba(255,255,255,0.25)', marginBottom: '6px',
+            color: 'rgba(255,255,255,0.5)', marginBottom: '6px',
             fontWeight: '600', fontFamily: 'var(--font-display)',
           }}>
             ORBITAL DEFENSE SYSTEM
@@ -286,7 +286,7 @@ export default function LandingPage({ onEnter }) {
                 </span>
                 <span style={{
                   fontSize: '9px', fontFamily: 'var(--font-display)',
-                  color: 'rgba(255,255,255,0.3)',
+                  color: 'rgba(255,255,255,0.55)',
                   letterSpacing: '0.1em', fontWeight: '500',
                   marginLeft: '8px',
                 }}>
@@ -309,7 +309,7 @@ export default function LandingPage({ onEnter }) {
                   <span style={{
                     fontSize: '9px', fontWeight: '600',
                     fontFamily: 'var(--font-display)',
-                    color: 'rgba(255,255,255,0.35)',
+                    color: 'rgba(255,255,255,0.6)',
                     letterSpacing: '0.08em',
                     animation: `pipelineFade 5s ease-in-out ${i * 1}s infinite`,
                   }}>
@@ -369,7 +369,7 @@ export default function LandingPage({ onEnter }) {
           50%      { opacity: 1; transform: scale(1.05); }
         }
         @keyframes pipelineFade {
-          0%, 100% { color: rgba(255,255,255,0.25); }
+          0%, 100% { color: rgba(255,255,255,0.5); }
           20%, 35% { color: rgba(255,255,255,0.8); }
         }
         @keyframes marqueeScroll {
