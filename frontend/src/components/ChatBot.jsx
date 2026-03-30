@@ -118,6 +118,13 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
     }
   }, [messages, open])
 
+  // ESC closes the chat
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   // Start typing animation on new assistant message
   useEffect(() => {
     const lastIdx = messages.length - 1
@@ -182,6 +189,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
     const text = input.trim()
     if (!text || loading) return
     setInput('')
+    if (inputRef.current) { inputRef.current.style.height = 'auto' }
     setMessages(prev => [...prev, { role: 'user', content: text }])
     setLoading(true)
     const agentActivity = agentMessages?.length
@@ -269,7 +277,7 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
           </div>
 
           {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {messages.map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '7px' }}>
                 {m.role === 'assistant' && (
@@ -368,22 +376,42 @@ export default function ChatBot({ satellites = [], events = [], status = 'MONITO
           <div style={{
             padding: '8px 10px', flexShrink: 0,
             borderTop: '1px solid var(--border-subtle)',
-            display: 'flex', gap: '7px',
+            display: 'flex', gap: '7px', minWidth: 0,
             background: 'var(--bg-deep)',
           }}>
-            <input
-              ref={inputRef}
+            <textarea
+              ref={node => {
+                inputRef.current = node
+                // Recalculate height on mount (handles reopen with leftover text)
+                if (node) {
+                  node.style.height = 'auto'
+                  node.style.height = Math.min(node.scrollHeight, 120) + 'px'
+                }
+              }}
               value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
+              rows={1}
+              onChange={e => {
+                setInput(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  send()
+                }
+              }}
               placeholder="Ask about satellites, risks, orbits…"
               style={{
-                flex: 1, background: 'var(--bg-surface)',
+                flex: 1, minWidth: 0, background: 'var(--bg-surface)',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '7px 10px', fontSize: '12px',
                 color: 'var(--text-primary)', fontFamily: 'var(--font-body)',
                 outline: 'none', transition: 'border-color 0.15s',
+                resize: 'none', overflowY: 'auto', overflowX: 'hidden',
+                wordBreak: 'break-word', whiteSpace: 'pre-wrap',
+                lineHeight: '1.5', minHeight: '32px', maxHeight: '120px',
               }}
               onFocus={e => e.target.style.borderColor = 'var(--accent-dim)'}
               onBlur={e => e.target.style.borderColor = 'var(--border-subtle)'}
