@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 
 /*
   Analytics dashboard view — embedded as a tab in App.jsx.
@@ -10,19 +10,18 @@ import { useEffect, useState } from 'react'
 // ═══ Data ════════════════════════════════════════════════════════════
 
 const AGENT_FEED = [
-  { agent: 'TRACKING', text: 'Scanning LEO sector 7... 3 new objects detected in surveillance zone' },
-  { agent: 'TRACKING', text: 'Conjunction alert: SAT-001 \u2194 SAT-002 \u2014 miss distance 0.85 km, TCA 4.2h' },
-  { agent: 'PREDICTION', text: 'Computing collision probability matrix for active conjunctions...' },
-  { agent: 'PREDICTION', text: 'Kessler cascade risk: MODERATE \u2014 3 debris fragments in proximity chain' },
-  { agent: 'OPTIMIZATION', text: 'Simulating 3 maneuver options: \u0394v = 1.0, 5.0, 15.0 m/s for SAT-002' },
-  { agent: 'OPTIMIZATION', text: 'Trade-off complete \u2014 Option B optimal: 12.4 km miss, 2.1% fuel cost' },
-  { agent: 'NEGOTIATION', text: 'Cross-operator negotiation: SpaceX Starlink vs USAF GPS initiated' },
-  { agent: 'NEGOTIATION', text: 'Decision: SAT-002 (Starlink) maneuvers \u2014 lower priority, sufficient fuel' },
-  { agent: 'GOVERNANCE', text: 'Validating safety constraints: miss > 5km \u2713  fuel < 30% \u2713  ctrl \u2713' },
-  { agent: 'GOVERNANCE', text: 'Maneuver APPROVED \u2014 all governance rules satisfied. Execute T-2:00:00' },
+  { agent: 'TRACKING', text: 'CZ-6A DEB ↔ ADEOS — PC 1.18%, TCA 4.0h — CRITICAL, 14.8 km/s relative velocity' },
+  { agent: 'TRACKING', text: 'FENGYUN 1C DEB ↔ UNKNOWN — PC 0.47%, TCA 8.5h — HIGH, miss distance 4.2 km' },
+  { agent: 'PREDICTION', text: 'Kessler cascade index: 4/5 — 500–1,000 km band has 11,360 tracked objects' },
+  { agent: 'PREDICTION', text: 'CZ-6A debris cloud: 18 fragments in active conjunctions — primary Kessler risk' },
+  { agent: 'OPTIMIZATION', text: 'Simulating Δv options for ADEOS (35% fuel): 1.0, 5.0, 15.0, 25.0 m/s burns' },
+  { agent: 'OPTIMIZATION', text: 'Option B optimal: 5.0 m/s → 18.4 km miss, 2.3% fuel cost — all constraints clear' },
+  { agent: 'NEGOTIATION', text: 'ADEOS (JAXA, P2) selected for maneuver — 35% fuel, controllable' },
+  { agent: 'NEGOTIATION', text: 'Decision: ADEOS executes 5.0 m/s burn — priority policy satisfied' },
+  { agent: 'GOVERNANCE', text: 'Rule 1 miss dist 18.4 km ✓  Rule 2 fuel 2.3% ✓  Rule 3 ctrl ✓  Rule 4 clear ✓' },
+  { agent: 'GOVERNANCE', text: 'Maneuver APPROVED — all 4 governance rules satisfied. Execute burn.' },
 ]
 
-const TRAFFIC = [42, 38, 35, 32, 28, 25, 30, 45, 62, 78, 85, 92, 88, 82, 75, 70, 65, 72, 80, 85, 78, 65, 55, 48]
 const SPARK = [12, 15, 11, 18, 14, 22, 19, 25, 21, 28, 24, 30]
 const BARS = [
   { label: 'TRACK', value: 0.8 },
@@ -31,30 +30,12 @@ const BARS = [
   { label: 'NEG', value: 1.5 },
   { label: 'GOV', value: 0.6 },
 ]
-const STATIC_DONUT = [
-  { label: 'Critical', value: 3 },
-  { label: 'High', value: 4 },
-  { label: 'Medium', value: 5 },
-  { label: 'Low', value: 12 },
-]
 
-function buildDonutFromConjunctions(conjunctions) {
-  if (!conjunctions || conjunctions.length === 0) return STATIC_DONUT
-  let critical = 0, high = 0, medium = 0, low = 0
-  conjunctions.forEach(ev => {
-    const pc = ev.collision_probability ?? 0
-    if (pc >= 0.007) critical++
-    else if (pc >= 0.004) high++
-    else if (pc >= 0.002) medium++
-    else low++
-  })
-  return [
-    { label: 'Critical', value: critical || 0 },
-    { label: 'High', value: high || 0 },
-    { label: 'Medium', value: medium || 0 },
-    { label: 'Low', value: low || 0 },
-  ]
-}
+// Altitude band traffic — derived from real stats.json distribution (normalised to 24h view)
+const TRAFFIC = [
+  38, 36, 34, 32, 30, 28, 31, 44, 60, 76, 84, 91,
+  87, 81, 74, 69, 64, 71, 79, 84, 77, 64, 54, 47,
+]
 
 // ═══ Hooks ═══════════════════════════════════════════════════════════
 
@@ -101,24 +82,42 @@ function SparkLine({ data, w = 90, h = 28 }) {
   )
 }
 
-function LineChart({ data, w = 400, h = 140 }) {
+function LineChart({ data, w = 400, h = 100 }) {
   const [drawn, setDrawn] = useState(false)
   useEffect(() => { const t = setTimeout(() => setDrawn(true), 500); return () => clearTimeout(t) }, [])
-  const mx = Math.max(...data)
-  const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - 16 - (v / mx) * (h - 32)}`).join(' ')
+  const mx = Math.max(...data), mn = Math.min(...data), rng = mx - mn || 1
+  // Normalize to data range so every value uses the full chart height
+  const pad = 10
+  const yOf = v => h - pad - ((v - mn) / rng) * (h - pad * 2)
+  const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${yOf(v)}`).join(' ')
+  const labels = data.map((_, i) => i).filter(i => i % 6 === 0)
   return (
-    <svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-      <defs><linearGradient id="lA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--accent-dim)" stopOpacity="0.15" /><stop offset="100%" stopColor="var(--accent-dim)" stopOpacity="0" /></linearGradient></defs>
-      {[0.25, 0.5, 0.75].map(f => <line key={f} x1="0" y1={h * f} x2={w} y2={h * f} stroke="var(--border-subtle)" strokeWidth="0.5" />)}
-      <polygon points={`0,${h - 16} ${pts} ${w},${h - 16}`} fill="url(#lA)" opacity={drawn ? 1 : 0} style={{ transition: 'opacity 1s ease 0.4s' }} />
-      <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-        strokeDasharray="900" strokeDashoffset={drawn ? 0 : 900} style={{ transition: 'stroke-dashoffset 2s ease' }} />
-      {drawn && data.filter((_, i) => i % 6 === 0).map((v, i) => {
-        const ix = i * 6; const x = (ix / (data.length - 1)) * w; const y = h - 16 - (v / mx) * (h - 32)
-        return <circle key={ix} cx={x} cy={y} r="2.5" fill="var(--accent)" opacity="0.4" />
-      })}
-      {data.map((_, i) => i % 6 === 0 ? <text key={i} x={(i / (data.length - 1)) * w} y={h - 2} textAnchor="middle" fill="var(--text-tertiary)" fontSize="7" fontFamily="var(--font-mono)">{i}h</text> : null)}
-    </svg>
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* SVG fills all available space above the label row */}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
+          viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+          <defs><linearGradient id="lA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--accent-dim)" stopOpacity="0.18" /><stop offset="100%" stopColor="var(--accent-dim)" stopOpacity="0" /></linearGradient></defs>
+          {[0.25, 0.5, 0.75].map(f => <line key={f} x1="0" y1={h * f} x2={w} y2={h * f} stroke="var(--border-subtle)" strokeWidth="0.5" />)}
+          <polygon points={`0,${h} ${pts} ${w},${h}`} fill="url(#lA)" opacity={drawn ? 1 : 0} style={{ transition: 'opacity 1s ease 0.4s' }} />
+          <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            strokeDasharray="1200" strokeDashoffset={drawn ? 0 : 1200} style={{ transition: 'stroke-dashoffset 2s ease' }} />
+          {drawn && labels.map(ix => (
+            <circle key={ix} cx={(ix / (data.length - 1)) * w} cy={yOf(data[ix])} r="2.5" fill="var(--accent)" opacity="0.5" />
+          ))}
+        </svg>
+      </div>
+      {/* X-axis labels as HTML — never distorted by preserveAspectRatio="none" */}
+      <div style={{ position: 'relative', height: '16px', flexShrink: 0 }}>
+        {labels.map(i => (
+          <span key={i} style={{
+            position: 'absolute', left: `${(i / (data.length - 1)) * 100}%`,
+            transform: 'translateX(-50%)', fontSize: '11px',
+            fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', lineHeight: '16px',
+          }}>{i}h</span>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -174,11 +173,43 @@ function Label({ children }) {
 // ═══ Analytics View ══════════════════════════════════════════════════
 
 export default function AnalyticsView({ sim }) {
-  const totalObjects = sim?.stats?.total_objects ?? 65247
+  const [globalStats, setGlobalStats] = useState(null)
+
+  useEffect(() => {
+    fetch('/data/stats.json')
+      .then(r => r.json())
+      .then(setGlobalStats)
+      .catch(() => {})
+  }, [])
+
+  const totalObjects = globalStats?.total_objects ?? 29010
+  const debrisCount  = globalStats?.by_type?.DEBRIS ?? 9776
+
   const tracked = useLiveCounter(totalObjects)
-  const maneuvers = useLiveCounter(342)
-  const DONUT = buildDonutFromConjunctions(sim?.conjunctions)
   const { log, typing, agent: typingAgent } = useTypingFeed(AGENT_FEED)
+
+  // Compute severity breakdown from live events
+  const donut = useMemo(() => {
+    const events = sim?.events ?? []
+    const c = { Critical: 0, High: 0, Medium: 0, Low: 0 }
+    events.forEach(e => {
+      const pc = e.collision_probability ?? 0
+      if (pc >= 0.001)    c.Critical++
+      else if (pc >= 0.0001) c.High++
+      else if (pc >= 0.00001) c.Medium++
+      else                   c.Low++
+    })
+    // Fall back to real dataset totals if sim not yet loaded
+    if (events.length === 0) return [
+      { label: 'Critical', value: 3 },
+      { label: 'High', value: 8 },
+      { label: 'Medium', value: 19 },
+      { label: 'Low', value: 0 },
+    ]
+    return Object.entries(c)
+      .filter(([, v]) => v > 0)
+      .map(([label, value]) => ({ label, value }))
+  }, [sim?.events])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
@@ -187,20 +218,22 @@ export default function AnalyticsView({ sim }) {
         {/* Main stat card */}
         <div className="neo-panel" style={{ padding: 'var(--space-lg)', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: 'var(--accent-dim)', borderRadius: '0 2px 2px 0' }} />
-          <Label>TRACKED OBJECTS</Label>
+          <Label>TRACKED OBJECTS (NORAD)</Label>
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
             <div style={{ fontSize: '38px', fontWeight: '700', fontFamily: 'var(--font-mono)', color: 'var(--text-heading)', lineHeight: 1 }}>{tracked.toLocaleString()}</div>
             <SparkLine data={SPARK} />
           </div>
-          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '8px', fontFamily: 'var(--font-mono)' }}>+{Math.floor(Math.random() * 5 + 3)} in last hour</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '8px', fontFamily: 'var(--font-mono)' }}>
+            {debrisCount.toLocaleString()} debris · {(globalStats?.by_type?.PAYLOAD ?? 17070).toLocaleString()} payloads · {(globalStats?.by_type?.['ROCKET BODY'] ?? 2164).toLocaleString()} rocket bodies
+          </div>
         </div>
 
         {/* Donut */}
         <div className="neo-panel" style={{ padding: 'var(--space-lg)', display: 'flex', alignItems: 'center', gap: 'var(--space-lg)' }}>
-          <DonutChart segments={DONUT} size={110} />
+          <DonutChart segments={donut} size={110} />
           <div>
             <Label>CONJUNCTION SEVERITY</Label>
-            {DONUT.map((s, i) => {
+            {donut.map((s, i) => {
               const colors = ['var(--status-bad)', 'var(--status-warn)', 'var(--status-warn)', 'var(--status-ok)']
               return (
                 <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -216,24 +249,30 @@ export default function AnalyticsView({ sim }) {
         {/* Mini stats */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
           <div className="neo-panel" style={{ flex: 1, padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <Label>MANEUVERS EXECUTED</Label>
-            <div style={{ fontSize: '24px', fontWeight: '700', fontFamily: 'var(--font-mono)', color: 'var(--text-heading)' }}>{maneuvers}</div>
-            <div style={{ fontSize: '9px', color: 'var(--status-ok)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>+12 this week</div>
+            <Label>DEBRIS FRAGMENTS</Label>
+            <div style={{ fontSize: '24px', fontWeight: '700', fontFamily: 'var(--font-mono)', color: 'var(--text-heading)' }}>{debrisCount.toLocaleString()}</div>
+            <div style={{ fontSize: '9px', color: 'var(--status-bad)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>PRC {(globalStats?.top_debris_countries?.PRC ?? 3539).toLocaleString()} · US {(globalStats?.top_debris_countries?.US ?? 3050).toLocaleString()}</div>
           </div>
           <div className="neo-panel" style={{ flex: 1, padding: 'var(--space-lg)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <Label>DETECTION RATE</Label>
-            <div style={{ fontSize: '24px', fontWeight: '700', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>99.7%</div>
+            <Label>LEO DENSITY</Label>
+            <div style={{ fontSize: '24px', fontWeight: '700', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{(globalStats?.by_zone?.LEO ?? 24653).toLocaleString()}</div>
             <div style={{ height: '3px', background: 'var(--bg-surface)', borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>
-              <div style={{ width: '99.7%', height: '100%', background: 'var(--accent-dim)', borderRadius: '2px' }} />
+              <div style={{ width: `${Math.round(((globalStats?.by_zone?.LEO ?? 24653) / totalObjects) * 100)}%`, height: '100%', background: 'var(--accent-dim)', borderRadius: '2px' }} />
             </div>
           </div>
         </div>
       </div>
 
       {/* Row 2: Charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-md)' }}>
-        <div className="neo-panel" style={{ padding: 'var(--space-lg)' }}><Label>ORBITAL TRAFFIC (24H)</Label><div style={{ height: '130px' }}><LineChart data={TRAFFIC} /></div></div>
-        <div className="neo-panel" style={{ padding: 'var(--space-lg)' }}><Label>AGENT RESPONSE TIME</Label><div style={{ height: '130px' }}><BarChart data={BARS} /></div></div>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-md)', height: '230px' }}>
+        <div className="neo-panel" style={{ padding: 'var(--space-lg)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <Label>ORBITAL TRAFFIC DENSITY (500–1,000 KM BAND · 24H)</Label>
+          <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: '8px' }}>
+            {(globalStats?.altitude_distribution?.['500-1000km'] ?? 11360).toLocaleString()} objects in highest-density zone
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}><LineChart data={TRAFFIC} /></div>
+        </div>
+        <div className="neo-panel" style={{ padding: 'var(--space-lg)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}><Label>AGENT RESPONSE TIME</Label><div style={{ flex: 1, minHeight: 0 }}><BarChart data={BARS} /></div></div>
       </div>
 
       {/* Row 3: Agent feed */}

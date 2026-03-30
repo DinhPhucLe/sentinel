@@ -5,26 +5,37 @@ import { createEarth } from '../utils/createEarth'
 
 const EARTH_RADIUS = 2.5
 
+// Graduated altitude mapping for 50-object dataset (420–960 km LEO range)
 function altToRadius(alt) {
-  if (alt > 10000) return EARTH_RADIUS + 3.0
-  if (alt > 1000)  return EARTH_RADIUS + 1.8
-  if (alt > 350)   return EARTH_RADIUS + 0.8
-  return EARTH_RADIUS + 0.5
+  if (alt > 10000) return EARTH_RADIUS + 3.0   // MEO/GEO
+  if (alt > 1000)  return EARTH_RADIUS + 1.8   // upper LEO
+  if (alt > 850)   return EARTH_RADIUS + 1.5   // high LEO (SSO ~850-960 km)
+  if (alt > 700)   return EARTH_RADIUS + 1.2   // mid LEO (SSO ~700-850 km)
+  if (alt > 550)   return EARTH_RADIUS + 1.0   // low-mid LEO (550-700 km)
+  if (alt > 400)   return EARTH_RADIUS + 0.8   // low LEO (ISS/HST ~400-550 km)
+  return EARTH_RADIUS + 0.6                     // very low LEO
 }
 
 const SAT_COLORS = {
-  GPS: 0x00C8F0, STARLINK: 0x90B0C0, ISS: 0xD0D8E0, DEBRIS: 0x505860,
-  JAXA: 0x00B4E0, ROSCOSMOS: 0xE07040, UNKNOWN: 0x606870,
+  GPS: 0x00C8F0, STARLINK: 0x90B0C0, ISS: 0xF0D060, DEBRIS: 0x505860,
+  JAXA: 0x00B4E0, ROSCOSMOS: 0xE07040, CNSA: 0xE04040,
+  ESA: 0x4488FF, NASA: 0xFFA020, NOAA: 0x20C890,
+  US: 0x7090A0, GER: 0x80B060, CHLE: 0xC0A050, UNKNOWN: 0x606870,
 }
 const SAT_HEX = {
-  GPS: '#00C8F0', STARLINK: '#90B0C0', ISS: '#D0D8E0', DEBRIS: '#505860', UNKNOWN: '#606870',
+  GPS: '#00C8F0', STARLINK: '#90B0C0', ISS: '#F0D060', DEBRIS: '#505860',
+  JAXA: '#00B4E0', ROSCOSMOS: '#E07040', CNSA: '#E04040',
+  ESA: '#4488FF', NASA: '#FFA020', NOAA: '#20C890',
+  US: '#7090A0', GER: '#80B060', CHLE: '#C0A050', UNKNOWN: '#606870',
 }
 
+// Absolute 10x-step thresholds based on NORAD operational standards (not data-fitted)
+// 0.01% = mandatory review threshold; 0.1% = serious concern; 1% = critical emergency
 const CONJ_TIERS = [
-  { key: 'CRITICAL', label: 'CRITICAL', color: '#f87171', test: p => p >= 0.7 },
-  { key: 'HIGH',     label: 'HIGH',     color: '#fb923c', test: p => p >= 0.4 && p < 0.7 },
-  { key: 'MEDIUM',   label: 'MEDIUM',   color: '#fbbf24', test: p => p >= 0.2 && p < 0.4 },
-  { key: 'LOW',      label: 'LOW',      color: '#34d399', test: p => p < 0.2 },
+  { key: 'CRITICAL', label: 'CRITICAL', color: '#f87171', test: p => p >= 0.01 },                // ≥1%
+  { key: 'HIGH',     label: 'HIGH',     color: '#fb923c', test: p => p >= 0.001 && p < 0.01 },   // 0.1–1%
+  { key: 'MEDIUM',   label: 'MEDIUM',   color: '#fbbf24', test: p => p >= 0.0001 && p < 0.001 }, // 0.01–0.1%
+  { key: 'LOW',      label: 'LOW',      color: '#34d399', test: p => p < 0.0001 },               // <0.01%
 ]
 const CONJ_COLOR_THREE = { CRITICAL: 0xf87171, HIGH: 0xfb923c, MEDIUM: 0xfbbf24, LOW: 0x34d399 }
 
@@ -320,7 +331,7 @@ const AGENT_META_CANVAS = {
   system:             { color: '#f87171', label: 'SYS' },
 }
 
-export default function OrbitCanvas({ satellites, events, decision, status, simMode, agentMessages, onEndSim }) {
+export default function OrbitCanvas({ satellites, events, decision, status, simMode, agentMessages, layerOverrides, onEndSim }) {
   const mountRef = useRef(null)
   const stateRef = useRef({
     renderer: null, scene: null, camera: null, animId: null, controls: null,
@@ -349,6 +360,9 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
     sats: {},
     conjTiers: { CRITICAL: true, HIGH: true, MEDIUM: true, LOW: true },
   })
+  // Always reflects latest layers so the animation loop can read it without stale closures
+  const layersRef = useRef(layers)
+  useEffect(() => { layersRef.current = layers }, [layers])
 
   // ── Three.js init ──────────────────────────────────────────────────
   useEffect(() => {
@@ -657,9 +671,11 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
       }
 
       if (s.simPhase === 'exiting') {
-        s.simLerpT = Math.min(s.simLerpT + 0.012, 1)
-        const ease = 1 - Math.pow(1 - s.simLerpT, 3)
-        s.camera.position.lerpVectors(s.simExitCamStart, new THREE.Vector3(0, 5, 10), ease)
+        s.simLerpT = Math.min(s.simLerpT + 0.007, 1)
+        const t = s.simLerpT
+        // Cubic ease-in-out: slow start → accelerate → slow finish (cinematic zoom-out)
+        const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+        s.camera.position.lerpVectors(s.simExitCamStart, new THREE.Vector3(0, 7, 14), ease)
         s.controls.target.lerpVectors(s.simExitTargetStart, new THREE.Vector3(0, 0, 0), ease)
         if (s.simLerpT >= 1) {
           s.simPhase = null
@@ -667,6 +683,19 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
           s.controls.maxDistance = 25
           s.controls.zoomSpeed = 0.8
           s.controls.autoRotate = !s.paused
+          // Apply current layers now that simPhase is null (layers useEffect was blocked during exit)
+          const L = layersRef.current
+          Object.entries(s.orbitLines).forEach(([key, obj]) => {
+            if (!obj) return
+            if (key.endsWith('_label')) obj.visible = L.sats[key.replace('_label', '')] !== false
+            else obj.visible = L.orbitRings && L.sats[key] !== false
+          })
+          Object.entries(s.sats).forEach(([id, obj]) => {
+            if (obj) obj.mesh.visible = L.sats[id] !== false
+          })
+          Object.entries(s.conjLines).forEach(([, line]) => {
+            if (line) line.visible = L.conjTiers[line._tier] !== false
+          })
         }
       }
 
@@ -745,12 +774,13 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
     Object.values(s.orbitLines).forEach(l => l && s.scene.remove(l))
     s.sats = {}; s.orbitLines = {}
 
-    const orbitTilts = { 'SAT-001': 0.2, 'SAT-002': 0.35, 'SAT-003': -0.15, 'DEBRIS-001': 0.5 }
-
     satellites.forEach((sat, i) => {
       const color = SAT_COLORS[sat.operator] || SAT_COLORS.UNKNOWN
       const radius = altToRadius(sat.altitude_km)
-      const tilt = orbitTilts[sat.id] ?? (i * 0.2)
+      // Use real inclination (degrees → radians) for orbital plane tilt
+      const tilt = (sat.inclination ?? 0) * Math.PI / 180
+      // Golden-angle spread gives uniform distribution for any satellite count
+      const angleOffset = (i * 2.39996) % (2 * Math.PI)
 
       const line = makeOrbitLine(radius, tilt, color)
       s.scene.add(line); s.orbitLines[sat.id] = line
@@ -774,14 +804,11 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
 
       s.sats[sat.id] = {
         mesh, orbitRadius: radius, avoidOrbitRadius: radius + 0.6,
-        speed: 0.3 / (radius / EARTH_RADIUS), tilt, angleOffset: i * (Math.PI / 2),
-        isAvoiding: sat.id === 'SAT-002', currentRadius: radius,
+        speed: 0.3 / (radius / EARTH_RADIUS), tilt, angleOffset,
+        isAvoiding: false, currentRadius: radius,
         operator: sat.operator, controllable: sat.controllable,
       }
     })
-
-    if (s.sats['SAT-001']) s.sats['SAT-001'].angleOffset = 0
-    if (s.sats['SAT-002']) s.sats['SAT-002'].angleOffset = 0.1
 
     setLayers(prev => {
       const sats = { ...prev.sats }
@@ -874,8 +901,34 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
         s.scene.add(cone); s.simArrows.push(cone)
       }
 
-      // Hide normal orbit lines during sim (grey sim lines replace them)
+      // Hide all orbit lines (grey sim-specific lines replace the two active ones)
       Object.entries(s.orbitLines).forEach(([, line]) => { if (line) line.visible = false })
+
+      // Isolate: hide every satellite mesh except the two being simulated
+      Object.entries(s.sats).forEach(([satId, obj]) => {
+        if (obj) obj.mesh.visible = satId === focusId || satId === partnerId
+      })
+
+      // Hide all conjunction lines except the one linking the focused pair
+      Object.values(s.conjLines).forEach(line => {
+        if (!line) return
+        const ev = line._eventData
+        const isFocused = ev?.sat_a?.id === focusId || ev?.sat_b?.id === focusId ||
+                          ev?.sat_a?.id === partnerId || ev?.sat_b?.id === partnerId
+        line.visible = isFocused
+      })
+
+      // Show only the conjunction edge between the two active satellites; hide all others
+      const activeSatAId = simMode.satAId
+      const activeSatBId = simMode.satBId
+      Object.values(s.conjLines).forEach(line => {
+        if (!line?._eventData) return
+        const { sat_a, sat_b } = line._eventData
+        const isActive =
+          (sat_a?.id === activeSatAId && sat_b?.id === activeSatBId) ||
+          (sat_a?.id === activeSatBId && sat_b?.id === activeSatAId)
+        line.visible = isActive
+      })
 
       setFocusSatId(focusId)
     } else {
@@ -895,12 +948,18 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
       s.simRedLine = null; s.simGreenArc = null; s.simArrows = []
       s.simFocusId = null; s.simPartnerFocusId = null
 
-      // Restore normal orbit line visibility (based on layers)
-      Object.entries(s.orbitLines).forEach(([key, line]) => {
-        if (!line) return
-        if (key.endsWith('_label')) { line.visible = true; return }
-        line.visible = true
+      // Restore everything — all objects, orbit rings, conjunction lines
+      Object.values(s.orbitLines).forEach(line => { if (line) line.visible = true })
+      Object.values(s.sats).forEach(obj => { if (obj) obj.mesh.visible = true })
+      Object.values(s.conjLines).forEach(line => {
+        if (line) { line.visible = true; line.material.opacity = 0.6 }
       })
+      // Full show-all: reset every layer toggle so the UI reflects the restored state
+      setLayers(prev => ({
+        orbitRings: true,
+        sats: Object.fromEntries(Object.keys(prev.sats).map(id => [id, true])),
+        conjTiers: { CRITICAL: true, HIGH: true, MEDIUM: true, LOW: true },
+      }))
       setFocusSatId(null)
     }
   }, [simMode])
@@ -939,6 +998,18 @@ export default function OrbitCanvas({ satellites, events, decision, status, simM
 
     setFocusSatId(newFocus)
   }, [simMode, satellites])
+
+  // ── External layer overrides (from chat assistant) ─────────────────
+  useEffect(() => {
+    if (!layerOverrides?.length) return
+    const { layer, visible } = layerOverrides[layerOverrides.length - 1]
+    setLayers(prev => {
+      if (layer === 'orbitRings') return { ...prev, orbitRings: visible }
+      if (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(layer))
+        return { ...prev, conjTiers: { ...prev.conjTiers, [layer]: visible } }
+      return prev
+    })
+  }, [layerOverrides?.length])
 
   // ── Settings sync ──────────────────────────────────────────────────
   useEffect(() => {

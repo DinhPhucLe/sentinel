@@ -13,6 +13,7 @@ class Satellite:
     position: tuple[float, float, float]
     velocity: tuple[float, float, float]
     controllable: bool
+    inclination: float = 0.0  # orbital inclination in degrees
 
     def to_dict(self) -> dict:
         return asdict(self)

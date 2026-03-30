@@ -8,6 +8,7 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 #   ollama/llama3                (local Ollama, no key needed)
 #   gemini-2.0-flash             (needs GOOGLE_API_KEY)
 AGENT_MODEL = os.environ.get("AGENT_MODEL", "anthropic/claude-sonnet-4-6")
+FALLBACK_MODEL = os.environ.get("FALLBACK_MODEL", "anthropic/claude-sonnet-4-6")
 
 # WebSocket message types
 WS_MSG_AGENT = "agent_log"

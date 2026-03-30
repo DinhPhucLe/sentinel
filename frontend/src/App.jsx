@@ -40,7 +40,13 @@ function Sidebar({ active, onNav, onBack }) {
       background: 'var(--bg-elevated)',
       borderRight: '1px solid var(--border-subtle)',
     }}>
-      <div style={{ marginBottom: '8px' }}><SentinelMark size={32} /></div>
+      <button
+        onClick={onBack}
+        title="Back to Home"
+        style={{ marginBottom: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}
+      >
+        <SentinelMark size={32} />
+      </button>
       <div style={{ width: '28px', height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
 
       {/* Dashboard */}
@@ -60,12 +66,6 @@ function Sidebar({ active, onNav, onBack }) {
       <SideIcon active={active === 'satellites'} onClick={() => onNav('satellites')} label="Satellites">
         <path d="M12 2L8 6l4 4 4-4-4-4z" /><path d="M2 12l4 4 4-4-4-4-4 4z" />
         <path d="M12 22l4-4-4-4-4 4 4 4z" /><path d="M22 12l-4-4-4 4 4 4 4-4z" />
-      </SideIcon>
-
-      {/* Alerts */}
-      <SideIcon active={active === 'alerts'} onClick={() => onNav('alerts')} label="Alerts">
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
       </SideIcon>
 
       {/* Spacer */}
@@ -193,7 +193,7 @@ function ExpandedOverlay({ children, onClose, title }) {
   )
 }
 
-function MissionView({ sim }) {
+function MissionView({ sim, layerOverrides }) {
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [simMode, setSimMode] = useState(null)
   const [maneuverQueue, setManeuverQueue] = useState([])
@@ -235,7 +235,7 @@ function MissionView({ sim }) {
       overflow: 'hidden',
     }}>
       {/* Left — orbit canvas + bottom panels */}
-      <div style={{ display: 'grid', gridTemplateRows: '1fr 240px', gap: 'var(--space-md)', minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateRows: '1fr 240px', gap: 'var(--space-md)', minHeight: 0, overflow: 'hidden' }}>
         <div className="neo-panel" style={{ overflow: 'hidden', minHeight: 0, height: '100%' }}>
           <OrbitCanvas
             satellites={sim.satellites}
@@ -244,18 +244,19 @@ function MissionView({ sim }) {
             status={sim.status}
             simMode={simMode}
             agentMessages={sim.agentMessages}
+            layerOverrides={layerOverrides}
             onEndSim={handleEndSim}
           />
         </div>
-        {/* Bottom row: Agent Log + Maneuver Queue 50/50 */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)', minHeight: 0 }}>
-          <div style={{ position: 'relative', minHeight: 0 }}>
+        {/* Bottom row: Agent Log + Maneuver Queue 60/40 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 'var(--space-md)', minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', minHeight: 0, overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: '6px', right: '24px', zIndex: 2 }}>
               <ExpandBtn expanded={false} onClick={() => setExpandedPanel('agent')} />
             </div>
             <AgentLog messages={sim.agentMessages} />
           </div>
-          <div style={{ position: 'relative', minHeight: 0 }}>
+          <div style={{ position: 'relative', minHeight: 0, overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: '6px', right: '24px', zIndex: 2 }}>
               <ExpandBtn expanded={false} onClick={() => setExpandedPanel('queue')} />
             </div>
@@ -349,33 +350,6 @@ function SatellitesView({ satellites }) {
   )
 }
 
-// ═══ Alerts View ═════════════════════════════════════════════════════
-
-const ALERTS = [
-  { sev: 'critical', text: 'SAT-001 ↔ SAT-002 collision probability 82%', time: '2m ago' },
-  { sev: 'high', text: 'DEBRIS-001 entering GPS constellation altitude', time: '8m ago' },
-  { sev: 'medium', text: 'Starlink fuel reserves below 40% threshold', time: '15m ago' },
-  { sev: 'low', text: 'ISS orbit adjustment scheduled next pass', time: '1h ago' },
-  { sev: 'medium', text: 'New debris field detected at 550 km orbit', time: '2h ago' },
-]
-const SEV = { critical: 'var(--status-bad)', high: 'var(--status-bad)', medium: 'var(--status-warn)', low: 'var(--status-ok)' }
-
-function AlertsView() {
-  return (
-    <div className="neo-panel" style={{ padding: 'var(--space-lg)' }}>
-      <div style={{ fontSize: '10px', letterSpacing: '0.14em', color: 'var(--text-secondary)', fontWeight: '600', fontFamily: 'var(--font-display)', paddingBottom: '10px', marginBottom: '10px', borderBottom: '1px solid var(--border-subtle)' }}>ALERTS</div>
-      {ALERTS.map((a, i) => (
-        <div key={i} className="neo-inset" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', marginBottom: '8px' }}>
-          <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: SEV[a.sev], flexShrink: 0, animation: a.sev === 'critical' ? 'pulse 1.5s infinite' : 'none' }} />
-          <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)', fontWeight: '600', color: SEV[a.sev], letterSpacing: '0.06em', textTransform: 'uppercase', flexShrink: 0, background: 'var(--bg-deep)' }}>{a.sev}</span>
-          <span style={{ fontSize: '12px', color: 'var(--text-primary)', flex: 1 }}>{a.text}</span>
-          <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{a.time}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // ═══ Dashboard ═══════════════════════════════════════════════════════
 
 function Dashboard({ onBack }) {
@@ -410,9 +384,8 @@ function Dashboard({ onBack }) {
           overflow: view === 'mission' ? 'hidden' : 'auto',
         }}>
           {view === 'dashboard'   && <AnalyticsView sim={sim} />}
-          {view === 'mission'     && <MissionView sim={sim} />}
+          {view === 'mission'     && <MissionView sim={sim} layerOverrides={chatLayerOverrides} />}
           {view === 'satellites'  && <SatellitesView satellites={sim.satellites} />}
-          {view === 'alerts'      && <AlertsView />}
         </main>
       </div>
       <ChatBot

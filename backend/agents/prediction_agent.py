@@ -8,10 +8,7 @@ with satellite priority, debris implications, and Kessler syndrome risk.
 from google.adk.agents import LlmAgent
 from config import AGENT_MODEL
 
-prediction_agent = LlmAgent(
-    name="prediction_agent",
-    model=AGENT_MODEL,
-    instruction="""You are the Prediction Agent in an Autonomous Orbital Traffic Control system.
+_INSTRUCTION = """You are the Prediction Agent in an Autonomous Orbital Traffic Control system.
 
 Output ONLY the following format. No preamble, no "Certainly!", no extra text. Substitute actual values from the data in 'tracking_assessment'.
 
@@ -33,7 +30,17 @@ Rules for filling in the template:
 - CASCADE RISK: CRITICAL if Kessler index ≥ 4; HIGH if ≥ 3; MODERATE if ≥ 2; LOW otherwise
 - Do NOT recalculate probabilities — read them from tracking_assessment
 - ASSESSMENT is exactly 2 sentences — no padding
-""",
-    tools=[],
-    output_key="risk_assessment",
-)
+"""
+
+
+def make_prediction_agent(model: str) -> LlmAgent:
+    return LlmAgent(
+        name="prediction_agent",
+        model=model,
+        instruction=_INSTRUCTION,
+        tools=[],
+        output_key="risk_assessment",
+    )
+
+
+prediction_agent = make_prediction_agent(AGENT_MODEL)

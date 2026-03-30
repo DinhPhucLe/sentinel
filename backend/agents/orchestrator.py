@@ -19,13 +19,14 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types as genai_types
 
-from agents.tracking_agent import tracking_agent
-from agents.prediction_agent import prediction_agent
-from agents.optimization_agent import optimization_agent
-from agents.negotiation_agent import negotiation_agent
-from agents.governance_agent import governance_agent
+from agents.tracking_agent import tracking_agent, make_tracking_agent
+from agents.prediction_agent import prediction_agent, make_prediction_agent
+from agents.optimization_agent import optimization_agent, make_optimization_agent
+from agents.negotiation_agent import negotiation_agent, make_negotiation_agent
+from agents.governance_agent import governance_agent, make_governance_agent
 from tools.orbital_sim import get_conjunction_events, get_kessler_cascade_events, simulate_maneuver
-from tools.real_data_loader import get_real_kessler_events, get_space_environment_context
+from tools.real_data_loader import get_real_kessler_events, get_space_environment_context, get_real_satellites
+from config import FALLBACK_MODEL
 
 # Module-level constant — loaded once when orchestrator is first imported
 _SPACE_CONTEXT = get_space_environment_context()
@@ -43,10 +44,18 @@ AGENT_ORDER = [
 _pipeline = None
 _session_service = None
 _runner = None
+_fallback_runner = None
+
+
+def _get_session_service() -> InMemorySessionService:
+    global _session_service
+    if _session_service is None:
+        _session_service = InMemorySessionService()
+    return _session_service
 
 
 def _get_runner() -> Runner:
-    global _pipeline, _session_service, _runner
+    global _pipeline, _runner
     if _runner is None:
         _pipeline = SequentialAgent(
             name="orbital_pipeline",
@@ -58,13 +67,39 @@ def _get_runner() -> Runner:
                 governance_agent,
             ],
         )
-        _session_service = InMemorySessionService()
         _runner = Runner(
             agent=_pipeline,
             app_name=APP_NAME,
-            session_service=_session_service,
+            session_service=_get_session_service(),
         )
     return _runner
+
+
+def _get_fallback_runner() -> Runner:
+    global _fallback_runner
+    if _fallback_runner is None:
+        fallback_pipeline = SequentialAgent(
+            name="orbital_pipeline_fallback",
+            sub_agents=[
+                make_tracking_agent(FALLBACK_MODEL),
+                make_prediction_agent(FALLBACK_MODEL),
+                make_optimization_agent(FALLBACK_MODEL),
+                make_negotiation_agent(FALLBACK_MODEL),
+                make_governance_agent(FALLBACK_MODEL),
+            ],
+        )
+        _fallback_runner = Runner(
+            agent=fallback_pipeline,
+            app_name=APP_NAME,
+            session_service=_get_session_service(),
+        )
+    return _fallback_runner
+
+
+def _is_rate_limit_error(e: Exception) -> bool:
+    name = type(e).__name__.lower()
+    msg = str(e).lower()
+    return "ratelimit" in name or "rate_limit" in name or "rate limit" in msg or "rate_limit" in msg
 
 
 def _ts() -> str:
@@ -90,30 +125,51 @@ def _is_validated(gov_output: str) -> bool:
 
 def _build_maneuver_table() -> str:
     """
-    Pre-compute maneuver simulations for all viable candidates and approaches.
-    Returns a formatted table string to inject into the agent brief.
+    Pre-compute maneuver simulations for all conjunction satellites.
+    Dynamically reads real satellite data; includes secondary conflict check at TCA.
+    Returns a formatted string to inject into the agent brief.
     """
+    events = get_conjunction_events()
+    if not events:
+        return "No conjunction events available."
+
+    ev = events[0]
     lines = []
 
-    # SAT-002 (Starlink, priority 2) — primary candidate
-    lines.append("SAT-002 (STARLINK-3421, P2, 62% fuel) — preferred candidate:")
-    for dv in [1.0, 5.0, 15.0, 25.0]:
-        r = simulate_maneuver("SAT-002", dv)
-        safe = "✓" if r["new_miss_distance_km"] > 5.0 else "✗"
-        lines.append(
-            f"  {dv:5.1f} m/s → miss {r['new_miss_distance_km']:6.2f} km  "
-            f"fuel {r['fuel_consumed']*100:4.1f}%  {safe}"
-        )
+    for sat_obj in [ev.sat_a, ev.sat_b]:
+        if not sat_obj.controllable or sat_obj.fuel_remaining == 0:
+            reason = "uncontrollable DEBRIS" if not sat_obj.controllable else "no fuel"
+            lines.append(
+                f"{sat_obj.name} ({sat_obj.id}, P{sat_obj.priority}) "
+                f"— {reason} — CANNOT MANEUVER"
+            )
+            continue
 
-    # SAT-001 (GPS, priority 1) — policy restricts this, emergency only
-    lines.append("SAT-001 (GPS-IIR-14, P1, 85% fuel) — EMERGENCY / policy override only:")
-    for dv in [5.0, 15.0]:
-        r = simulate_maneuver("SAT-001", dv)
-        safe = "✓" if r["new_miss_distance_km"] > 5.0 else "✗"
         lines.append(
-            f"  {dv:5.1f} m/s → miss {r['new_miss_distance_km']:6.2f} km  "
-            f"fuel {r['fuel_consumed']*100:4.1f}%  {safe}  [requires policy exception]"
+            f"{sat_obj.name} ({sat_obj.id}, P{sat_obj.priority}, "
+            f"{sat_obj.fuel_remaining * 100:.0f}% fuel) — maneuver candidate:"
         )
+        for dv in [1.0, 5.0, 15.0, 25.0]:
+            r = simulate_maneuver(sat_obj.id, dv)
+            fuel_pct = r["fuel_consumed"] * 100
+            primary_ok = r["new_miss_distance_km"] > 5.0 and r["fuel_consumed"] < sat_obj.fuel_remaining * 0.30
+            conflicts = r.get("secondary_conflicts", [])
+            safe = "✓" if (primary_ok and not conflicts) else "✗"
+
+            conflict_note = ""
+            if conflicts:
+                c_list = ", ".join(
+                    f"{c['sat_id']} ({c['sat_name']}) @ {c['miss_distance_km']} km"
+                    for c in conflicts
+                )
+                conflict_note = f"  ⚠ NEW RISK: {c_list}"
+            elif primary_ok:
+                conflict_note = "  ✓ clear of all other objects at TCA"
+
+            lines.append(
+                f"  {dv:5.1f} m/s → miss {r['new_miss_distance_km']:6.2f} km  "
+                f"fuel {fuel_pct:4.1f}%  {safe}{conflict_note}"
+            )
 
     return "\n".join(lines)
 
@@ -249,13 +305,25 @@ async def run_pipeline_streaming(
 
     maneuver_table = _build_maneuver_table()
 
+    sat_data = get_real_satellites()
+    catalog_lines = ["ALL TRACKED OBJECTS IN THIS SCENARIO (positions at epoch):"]
+    for s in sat_data["satellites"]:
+        catalog_lines.append(
+            f"  {s['id']} | {s['name']} | {s['operator']} | P{s['priority']} | "
+            f"alt {s['altitude_km']:.0f} km | fuel {s['fuel_remaining']*100:.0f}% | "
+            f"controllable={s['controllable']}"
+        )
+    satellite_catalog = "\n".join(catalog_lines)
+
     base_brief = (
         "ACTIVE CONJUNCTION EVENTS:\n"
         + "\n".join(event_lines)
-        + "\n\nAVAILABLE MANEUVER OPTIONS (pre-computed):\n"
+        + "\n\n"
+        + satellite_catalog
+        + "\n\nAVAILABLE MANEUVER OPTIONS (pre-computed, secondary conflicts checked at TCA):\n"
         + maneuver_table
         + "\n\nGovernance rules: miss distance > 5 km, fuel cost < 30% of remaining fuel, "
-        + "only controllable satellites may maneuver."
+        + "only controllable satellites may maneuver, no new secondary conflicts introduced."
     )
 
     runner = _get_runner()
@@ -281,7 +349,21 @@ async def run_pipeline_streaming(
         else:
             brief = base_brief
 
-        gov_output, neg_output = await _run_pass(runner, brief, user_id, emit, attempt)
+        try:
+            gov_output, neg_output = await _run_pass(runner, brief, user_id, emit, attempt)
+        except Exception as e:
+            if _is_rate_limit_error(e) and runner is not _get_fallback_runner():
+                await emit({
+                    "type": "agent_log",
+                    "agent": "system",
+                    "message": f"⚠ RATE LIMIT — switching to fallback model ({FALLBACK_MODEL})",
+                    "timestamp": _ts(),
+                })
+                runner = _get_fallback_runner()
+                gov_output, neg_output = await _run_pass(runner, brief, user_id, emit, attempt)
+            else:
+                raise
+
         validated = _is_validated(gov_output)
 
         if validated:

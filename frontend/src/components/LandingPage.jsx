@@ -82,8 +82,8 @@ export default function LandingPage({ onEnter }) {
   }, [])
 
   const stats = [
-    { value: 65000, label: 'OBJECTS IN ORBIT', suffix: '+' },
-    { value: 12000, label: 'NEAR-MISSES / YEAR', suffix: '+' },
+    { value: 29010, label: 'OBJECTS TRACKED' },
+    { value: 9776, label: 'DEBRIS PIECES' },
     { value: 5, label: 'AI AGENTS' },
   ]
 

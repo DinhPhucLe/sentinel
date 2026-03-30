@@ -268,9 +268,12 @@ async def chat(body: dict):
     events = context.get("events", [])
     status = context.get("status", "MONITORING")
     view = context.get("view", "mission")
+    agent_activity = context.get("agentActivity", "")
 
     sat_summary = json.dumps(satellites[:10], indent=2) if satellites else "No satellites loaded yet."
     event_summary = json.dumps(events[:5], indent=2) if events else "No conjunction events active."
+
+    activity_section = f"\n## Recent Agent Activity (last pipeline run)\n{agent_activity}" if agent_activity else ""
 
     system_prompt = f"""You are Sentinel AI, the intelligent assistant embedded in the Sentinel Orbital Traffic Control dashboard. You help operators understand the live orbital situation and navigate the UI.
 
@@ -297,7 +300,7 @@ In the Mission view, the 3D OrbitCanvas has:
 - LAYERS button — toggle per-satellite and per-severity conjunction tier visibility (CRITICAL/HIGH/MEDIUM/LOW)
 - SETTINGS button — camera sensitivity, simulation speed, invert controls
 - Click any satellite to open its detail popup (fuel, altitude, active conjunctions)
-
+{activity_section}
 ## Orbital Knowledge
 - LEO (Low Earth Orbit): 160–2,000 km — most congested zone; ISS (~408 km) and Starlink (~550 km) are here
 - MEO (Medium Earth Orbit): 2,000–35,786 km — GPS constellation at ~20,200 km
