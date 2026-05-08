@@ -187,7 +187,3 @@ python scheduler.py --run-now       # Start recurring updates
 MIT License — Phuc Le, 2026
 
 ---
-
-<div align="center">
-<sub>Built for HackUSF 2025</sub>
-</div>
