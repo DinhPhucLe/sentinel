@@ -158,7 +158,7 @@ def simulate_maneuver(sat_id: str, delta_v: float) -> dict:
             "delta_v_applied": delta_v,
             "new_position": list(sat.position),
             "new_miss_distance_km": 999.0,
-            "fuel_consumed": round(delta_v * 0.001, 4),
+            "fuel_consumed": min(round(delta_v * 0.001, 4), sat.fuel_remaining),
             "secondary_conflicts": [],
             "all_clear": True,
         }

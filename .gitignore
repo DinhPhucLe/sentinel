@@ -40,3 +40,5 @@ Thumbs.db
 
 #Plan.md file
 plan.md
+.playwright-mcp/
+docs/superpowers/

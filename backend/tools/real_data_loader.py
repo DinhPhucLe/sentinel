@@ -20,7 +20,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_DATA_DIR  = Path(__file__).parent.parent.parent / "data"
+_DATA_DIR  = Path(__file__).resolve().parent.parent.parent / "data"
 _CDM_PATH  = _DATA_DIR / "conjunctions.json"
 _STATS_PATH = _DATA_DIR / "stats.json"
 
